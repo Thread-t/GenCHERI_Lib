@@ -256,3 +256,23 @@ def ask_outdir(default="."):
         if err is None:
             return d
         print(f"  -> cannot use '{d}': {err}")
+
+#Sayak: function to write the generated files to the specific directory
+def port_headers(outdir, file_map):
+    """
+    Port (write) in-memory generated files to a target directory.
+    """
+    target_dir, err = prepare_dir(outdir)
+    if err:
+        return False, f"Failed to prepare directory '{target_dir}': {err}"
+    # Write each file to the target directory
+    written_paths = []
+    try:
+        for filename, content in file_map.items():
+            file_path = os.path.join(target_dir, filename)
+            with open(file_path, "w") as fh:
+                fh.write(content)
+            written_paths.append(file_path)
+        return True, written_paths
+    except Exception as e:
+        return False, f"Error writing files: {str(e)}"
