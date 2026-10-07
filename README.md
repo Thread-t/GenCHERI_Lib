@@ -110,7 +110,7 @@ Generation (stage 1) and porting/building (stage 2) are deliberately independent
 |---|---|---|---|
 | Metadata width | 32 bits | 32 bits | sum of field storage sizes |
 | Extra bound-region bits | 10 reserved (`BE2, TE2, L7, IE`) | 11 reserved (`BE3, TE3, IE`) | none |
-| Spare bits for perm/otype/flag | 7 | 6 | n/a |
+| Spare bits for perm/otype/flag | 8 | 7 | n/a |
 | Perm / otype / flag range | dependent limits | dependent limits | up to 32 bits each |
 | Bound | `32 − (p+o+f)` bits | `32 − (p+o+f)` bits | 1–64 bits, rounded to 8/16/32/64 |
 | `CHERI` type | `uint32_t` | `uint32_t` | `struct CHERI` |
