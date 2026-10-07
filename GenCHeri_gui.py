@@ -43,7 +43,7 @@ OPTION_RE = re.compile(r'option\(\s*([A-Za-z0-9_]+)\s+"([^"]*)"\s*(ON|OFF)?\s*\)
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOGO_FILE = os.path.join(HERE, "GenCHERI_logo.jpg")   #Sayak: logo shown in the header / window icon
-LOGO_HEIGHT = 80
+LOGO_HEIGHT = 56
 
 
 def logo_colours(img):
@@ -83,9 +83,9 @@ def parse_options(vp_dir):
     found = [(n, d, v == "ON") for n, d, v in OPTION_RE.findall(text)]
     return found or None
 
-#Sayak: Colapsible button for each section
+
 class Section(ttk.Frame):
-    """Card with a clickable header (▾ / ▸) that collapses its body."""
+    """Card with a clickable header (\u25be / \u25b8) that collapses its body, so one step can be tucked away while working on the other."""
     def __init__(self, parent, title, app, expand_body=False):
         super().__init__(parent, style="Card.TFrame")
         self.app, self.title, self.open = app, title, True
@@ -97,7 +97,7 @@ class Section(ttk.Frame):
         self._mark()
 
     def _mark(self):
-        self.head.configure(text=("▾  " if self.open else "▸  ") + self.title)
+        self.head.configure(text=("\u25be  " if self.open else "\u25b8  ") + self.title)
 
     def toggle(self):
         self.open = not self.open
@@ -107,6 +107,70 @@ class Section(ttk.Frame):
             self.body.pack_forget()
         self._mark()
 
+#Sayak: Drag-and-drop field order bar (Perm / Otype / Flag / Bound) for the GUI
+class OrderBar(ttk.Frame):
+    """Drag-and-drop field order. Four chips (Perm / Otype / Flag / Bound), left = MSB, right = LSB.
+    Drag a chip sideways; the others make room. The order string (e.g. "PFOB") is kept in `var`."""
+    NAMES = {"P": "Perm", "O": "Otype", "F": "Flag", "B": "Bound"}
+    W, H, GAP = 86, 34, 8
+
+    def __init__(self, parent, app, var):
+        super().__init__(parent, style="TFrame")
+        self.app, self.var, self.drag = app, var, None
+        self.order = list(var.get())
+        ttk.Label(self, text="MSB", style="Muted.TLabel").pack(side="left", padx=(0, 8))
+        self.area = tk.Frame(self, bg=app.CARD, height=self.H + 6, width=4 * self.W + 3 * self.GAP + 4)
+        self.area.pack(side="left")
+        self.area.pack_propagate(False)
+        ttk.Label(self, text="LSB", style="Muted.TLabel").pack(side="left", padx=(8, 0))
+        self.chips = {}
+        for k in "POFB":
+            c = tk.Label(self.area, text="\u283f  " + self.NAMES[k], font=app.FB, fg="white", bg=app.accent,
+                         cursor="fleur", width=0)
+            c.bind("<ButtonPress-1>", lambda e, k=k: self._press(e, k))
+            c.bind("<B1-Motion>", lambda e, k=k: self._move(e, k))
+            c.bind("<ButtonRelease-1>", lambda e, k=k: self._release(e, k))
+            self.chips[k] = c
+        var.trace_add("write", lambda *_: self._external())
+        self._layout()
+
+    def _x(self, i):
+        return 2 + i * (self.W + self.GAP)
+
+    def _layout(self, skip=None):
+        for i, k in enumerate(self.order):
+            if k != skip:
+                self.chips[k].place(x=self._x(i), y=3, width=self.W, height=self.H)
+
+    def _external(self):
+        new = list(self.var.get())
+        if sorted(new) == sorted("POFB") and new != self.order and self.drag is None:
+            self.order = new
+            self._layout()
+
+    def _press(self, e, k):
+        c = self.chips[k]
+        c.lift()
+        c.configure(bg=self.app.accent_dark)
+        self.drag = (k, e.x_root, self._x(self.order.index(k)))
+
+    def _move(self, e, k):
+        if self.drag is None:
+            return
+        _, x0, start = self.drag
+        nx = max(2, min(self._x(3), start + e.x_root - x0))
+        self.chips[k].place(x=nx, y=3, width=self.W, height=self.H)
+        idx = max(0, min(3, round((nx - 2) / (self.W + self.GAP))))
+        if idx != self.order.index(k):
+            self.order.remove(k)
+            self.order.insert(idx, k)
+            self._layout(skip=k)
+
+    def _release(self, e, k):
+        self.chips[k].configure(bg=self.app.accent)
+        self.drag = None
+        self._layout()
+        self.var.set("".join(self.order))
 
 class App(tk.Tk):
     def __init__(self):
@@ -122,8 +186,7 @@ class App(tk.Tk):
 
         v = self.v = {
             "template": tk.StringVar(value="1"), "compressed": tk.BooleanVar(value=False),
-            #Sayak: default values for the three templates are set here perms bits are now 1 less
-            "p": tk.StringVar(value="11"), "o": tk.StringVar(value="3"), "f": tk.StringVar(value="1"),
+            "p": tk.StringVar(value="12"), "o": tk.StringVar(value="3"), "f": tk.StringVar(value="1"),
             "bound": tk.StringVar(value="64"), "t": tk.StringVar(value="1"),
             "order": tk.StringVar(value=C.DEFAULT_ORDER),
             "staging": tk.StringVar(value=DEFAULT_STAGING),
@@ -170,7 +233,7 @@ class App(tk.Tk):
         st.configure(".", font=self.F, background=self.CARD, foreground=self.FG, fieldbackground=self.CARD,
                      bordercolor=self.LINE, lightcolor=self.CARD, darkcolor=self.CARD, troughcolor=self.BG)
         st.configure("TFrame", background=self.CARD)
-        st.configure("Card.TFrame", background=self.CARD, relief="solid", borderwidth=1, bordercolor=self.LINE) #Sayak :Added for card theme
+        st.configure("Card.TFrame", background=self.CARD, relief="solid", borderwidth=1, bordercolor=self.LINE)
         st.configure("Page.TFrame", background=self.BG)
         st.configure("TLabel", background=self.CARD, foreground=self.FG)
         st.configure("Muted.TLabel", foreground=self.MUTED)
@@ -222,8 +285,9 @@ class App(tk.Tk):
         root = ttk.Frame(self, padding=14, style="Page.TFrame")
         root.pack(fill="both", expand=True)
 
-        g = ttk.LabelFrame(root, text="  1  Generate headers  ", padding=12, style="Card.TLabelframe")
-        g.pack(fill="x")
+        self.sec1 = Section(root, "1   Generate headers", self)
+        self.sec1.pack(fill="x")
+        g = self.sec1.body
         for c in (1, 3, 5):
             g.columnconfigure(c, weight=1, uniform="c")
 
@@ -232,9 +296,14 @@ class App(tk.Tk):
                      state="readonly").grid(row=0, column=1, sticky="w", **pad)
         ttk.Checkbutton(g, text="Compressed instructions on", variable=self.v["compressed"]).grid(
             row=0, column=2, columnspan=2, sticky="w", **pad)
-        ttk.Label(g, text="Field order (MSB\u2192LSB)").grid(row=0, column=4, sticky="e", **pad)
-        ttk.Combobox(g, textvariable=self.v["order"], values=C.ORDERS, width=8, state="readonly").grid(
-            row=0, column=5, sticky="w", **pad)
+        
+        ttk.Label(g, text="Field order").grid(row=7, column=0, sticky="w", **pad)
+        OrderBar(g, self, self.v["order"]).grid(row=7, column=1, columnspan=5, sticky="w", **pad)
+        
+        #Sayak: Removed the field order combobox and replaced it with a drag-and-drop order bar
+        # ttk.Label(g, text="Field order (MSB\u2192LSB)").grid(row=0, column=4, sticky="e", **pad)
+        # ttk.Combobox(g, textvariable=self.v["order"], values=C.ORDERS, width=8, state="readonly").grid(
+        #     row=0, column=5, sticky="w", **pad)
 
         self.spins = {}
         for i, (key, label) in enumerate((("p", "Perm bits"), ("o", "Otype bits"), ("f", "Flag bits"))):
@@ -249,25 +318,6 @@ class App(tk.Tk):
         self.lbl_info = ttk.Label(g, text="", style="Info.TLabel")
         self.lbl_info.grid(row=2, column=2, columnspan=4, sticky="w", **pad)
 
-        # # Sayak: If you have user defined perms then write in the below box
-        # ttk.Label(g, text="User-defined perms").grid(row=3, column=0, sticky="nw", **pad)
-        # self.txt_perm = self._text(g, 3)
-        # self.txt_perm.grid(row=3, column=1, columnspan=2, sticky="ew", **pad)
-
-        # # Sayak: If you have user defined otypes then write in the below box
-        # ttk.Label(g, text="User-defined otypes").grid(row=3, column=3, sticky="nw", **pad)
-        # self.txt_otype = self._text(g, 3)
-        # self.txt_otype.grid(row=3, column=4, columnspan=2, sticky="ew", **pad)
-
-        # #Sayak: If you have user defined flags then write in the below box
-        # ttk.Label(g, text="User-defined flags").grid(row=3, column=6, sticky="nw", **pad)
-        # self.txt_otype = self._text(g, 3)
-        # self.txt_otype.grid(row=3, column=4, columnspan=2, sticky="ew", **pad)
-
-        # self.lbl_names = ttk.Label(g, text="", style="Muted.TLabel")
-        # self.lbl_names.grid(row=4, column=0, columnspan=6, sticky="w", **pad)
-
-        #Sayak: Added boxed one below another
         self.name_boxes = {}
         for r, (key, label) in enumerate((("perm", "User-defined perms"), ("otype", "User-defined otypes"),
                                           ("flag", "User-defined flags")), start=3):
@@ -279,16 +329,20 @@ class App(tk.Tk):
         self.lbl_names = ttk.Label(g, text="", style="Muted.TLabel")
         self.lbl_names.grid(row=6, column=0, columnspan=6, sticky="w", **pad)
 
-        ttk.Label(g, text="Staging folder").grid(row=5, column=0, sticky="w", **pad)
-        ttk.Entry(g, textvariable=self.v["staging"]).grid(row=5, column=1, columnspan=4, sticky="ew", **pad)
-        ttk.Button(g, text="Browse\u2026", command=lambda: self._browse("staging")).grid(row=5, column=5, sticky="e", **pad)
-        self.btn_gen = ttk.Button(g, text="\u2699  Generate headers", style="Accent.TButton", command=self.on_generate)
-        self.btn_gen.grid(row=6, column=0, columnspan=2, sticky="w", padx=6, pady=(10, 2))
-        self.lbl_gen = ttk.Label(g, text="Nothing generated yet.", style="Muted.TLabel")
-        self.lbl_gen.grid(row=6, column=2, columnspan=4, sticky="w", padx=6, pady=(10, 2))
+        #Sayak: Updated the staging folder label and entry to be below the user-defined perms/otypes/flags text boxes
+        ttk.Label(g, text="Staging folder").grid(row=8, column=0, sticky="w", **pad)
+        ttk.Entry(g, textvariable=self.v["staging"]).grid(row=8, column=1, columnspan=4, sticky="ew", **pad)
+        ttk.Button(g, text="Browse\u2026", command=lambda: self._browse("staging")).grid(row=8, column=5, sticky="e", **pad)
 
-        b = ttk.LabelFrame(root, text="  2  Port into riscv-vp and build  ", padding=12, style="Card.TLabelframe")
-        b.pack(fill="x", pady=(12, 0))
+        #Sayak: Updated the generate headers button and label to be below the staging folder entry
+        self.btn_gen = ttk.Button(g, text="\u2699  Generate headers", style="Accent.TButton", command=self.on_generate)
+        self.btn_gen.grid(row=9, column=0, columnspan=2, sticky="w", padx=6, pady=(10, 2))
+        self.lbl_gen = ttk.Label(g, text="Nothing generated yet.", style="Muted.TLabel")
+        self.lbl_gen.grid(row=9, column=2, columnspan=4, sticky="w", padx=6, pady=(10, 2))
+
+        self.sec2 = Section(root, "2   Port into riscv-vp and build", self)
+        self.sec2.pack(fill="x", pady=(12, 0))
+        b = self.sec2.body
         b.columnconfigure(1, weight=1)
         ttk.Label(b, text="VP folder").grid(row=0, column=0, sticky="w", **pad)
         ttk.Entry(b, textvariable=self.v["vp"]).grid(row=0, column=1, sticky="ew", **pad)
@@ -318,8 +372,9 @@ class App(tk.Tk):
         self.btn_port = ttk.Button(row, text="Port only", command=lambda: self.on_port_build(build=False))
         self.btn_port.pack(side="left", padx=8)
 
-        lf = ttk.LabelFrame(root, text="  Log  ", padding=8, style="Card.TLabelframe")
-        lf.pack(fill="both", expand=True, pady=(12, 0))
+        self.sec3 = Section(root, "Log", self, expand_body=True)
+        self.sec3.pack(fill="both", expand=True, pady=(12, 0))
+        lf = self.sec3.body
         self.log = tk.Text(lf, height=7, state="disabled", font=self.FM, wrap="none", bg="#1e2433", fg="#d7dcea",
                            insertbackground="white", relief="flat", bd=0, padx=10, pady=8)
         sy = ttk.Scrollbar(lf, command=self.log.yview)
@@ -403,8 +458,8 @@ class App(tk.Tk):
                 self.lbl_info.configure(text=f"bound = {bw} bits, metadata = {mw} bits, spare = {spare}; "
                                              f"T = {tb}, B = {bb}, {left} wasted")
             self.lbl_names.configure(
-                text=(f"Perm names: up to {max(p - C.HW_PERM_COUNT, 0)}   |   Otype names: up to {(1 << o) - 3}"))
-            for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, o > C.OTYPE_MIN)):
+                text=(f"Up to {max(p - C.HW_PERM_COUNT, 0)} perm names   |   {(1 << o) - 3} otype names   |   {(1 << f) - 1} flag names (CAP_MODE = 0 is built in)"))
+            for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, o > C.OTYPE_MIN), (self.txt_flag, f > C.FLAG_MIN)):
                 w.configure(state="normal" if on else "disabled", bg="white" if on else "#eef0f4")
         finally:
             self._busy_refresh = False
@@ -417,6 +472,7 @@ class App(tk.Tk):
                 t, self.v["compressed"].get(), p, o, f, self.v["order"].get(),
                 perm_names=self._names(self.txt_perm) if p > C.PERM_MIN else [],
                 otype_names=self._names(self.txt_otype) if o > C.OTYPE_MIN else [],
+                flag_names=self._names(self.txt_flag) if f > C.FLAG_MIN else [],
                 bound_bits=self._int("bound") if t == 3 else None,
                 t_bits=self._int("t") if t in (1, 2) else None,
                 general_name=GENERAL_FILE)
