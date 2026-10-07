@@ -1,3 +1,8 @@
+# generated files
+__pycache__/
+Tem*/
+tem*/
+
 # Prerequisites
 *.d
 

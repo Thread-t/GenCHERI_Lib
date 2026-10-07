@@ -7,8 +7,13 @@ Called from GenCHeri.py:  generate(cfg) -> text of general.h
 HW_PERMS = [
     "GLOBAL", "PERMIT_EXECUTE", "PERMIT_LOAD", "PERMIT_STORE", "PERMIT_LOAD_CAP",
     "PERMIT_STORE_CAP", "PERMIT_STORE_LOCAL_CAP", "PERMIT_SEAL", "PERMIT_INVOKE",
-    "PERMIT_UNSEAL", "PERMIT_ACC_SYS_REGS", "PERMIT_SET_CID",
+    "PERMIT_UNSEAL", "PERMIT_ACC_SYS_REGS",
 ]
+
+OTYPES = ["Unsealed", "Sealed", "Reserved"]  # user-defined otypes are appended after these
+
+FLAGS = ["CAP_MODE"]  # user-defined flags are appended after these
+
 FIELD_NAMES = {"P": "PERM", "O": "OTYPE", "F": "FLAG", "B": "BOUND"}
 # Reserved bits inside the bound region (IE, L7, T, TE, BE ...). Free B bits = bound region - reserved
 BOUND_RESERVED = {1: 10, 2: 11}
@@ -66,11 +71,12 @@ def generate(cfg):
     #Sayak: Add user defined Perms after hard coded perms
     hw_lines += "".join(f"\t{nm}, // user-defined\n" for nm in cfg["perm_names"])
     otype_lines = "".join(f"\t{nm} = Unsealed - {i + 3},\n" for i, nm in enumerate(cfg["otype_names"]))
+    flag_lines = "".join(f"\t{nm}, // user-defined\n" for nm in cfg["flag_names"])
 
     #if meta_w > 32:  ||<-- previous condition v_1 i removed during testing
     if cfg["template"] == 3 : #Sayak: template 3 always uses struct CHERI; templates 1/2 a plain uint32_t
-        cheri_def = ("typedef struct CHERI {\n    PERM perms;\n    OTYPE otype;\n"
-                     "    FLAG flags;\n  " + c_type(widths["B"]) + " bounds;\n} CHERI;")
+        cheri_def = ("struct CHERI {\n    PERM perms;\n    OTYPE otype;\n"
+                     "    FLAG flags;\n  " + c_type(widths["B"]) + " bounds;\n};")
                      #Sayak: " + ("uint64_t" if widths["B"] <= 64 else "unsigned __int128") + " bounds;\n} CHERI;")
     else: #for template 1/2
         cheri_def = "typedef uint32_t CHERI; //sayak_G"
@@ -117,12 +123,11 @@ enum Otypes {{
 	Unsealed = MAX_CAP_OTYPE - 1,
 	Sealed = Unsealed - 1, // Sealed is used as Sentry
 	Reserved = Unsealed - 2,
-    //User defined Otypes apends below
 {otype_lines}}};
 
 enum Flags {{
     CAP_MODE = 0,
-}};
+{flag_lines}}};
 
 typedef {c_type(widths['P'])} PERM; //sayak_G
 

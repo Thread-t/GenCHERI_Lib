@@ -13,15 +13,15 @@ Usage:
 """
 import argparse
 import os
-import re
+# import re
 import sys
 
-from gen_general import HW_PERMS, FIELD_NAMES, BOUND_RESERVED, generate, type_bits
+from gen_general import OTYPES, FLAGS, FIELD_NAMES, BOUND_RESERVED, generate, type_bits
 from gen_utils import *
 from helper import *
 
 #Sayak: Limit macros
-PERM_MIN, OTYPE_MIN, FLAG_MIN = 12, 2, 1  # lower limits only (no upper limit)
+PERM_MIN, OTYPE_MIN, FLAG_MIN, BOUND_MIN = 11, 2, 1, 10  # lower limits only (no upper limit)
 T3_BOUND_MAX = 64  # template 3: fixed bound width
 T12_META_BITS = 32  # templates 1/2: fixed metadata width
 T3_FIELD_MAX = 32 # Template 3 perms, otype and flag bits max width
@@ -30,7 +30,7 @@ T3_FIELD_MAX = 32 # Template 3 perms, otype and flag bits max width
 #   perm  : PERM_MIN  <= x <= PERM_MIN  + S
 #   otype : OTYPE_MIN <= y <= OTYPE_MIN + S - (x - PERM_MIN)
 #   flag  : FLAG_MIN  <= z <= FLAG_MIN  + S - (x - PERM_MIN) - (y - OTYPE_MIN)
-T12_SLACK = {1: 7, 2: 6}  #Sayak: Template 1 has 7 bits of slack, Template 2 has 6 bits of slack
+T12_SLACK = {1: 8, 2: 7}  #Sayak: Template 1 has 7 bits of slack, Template 2 has 6 bits of slack
 
 
 
@@ -50,11 +50,23 @@ def main():
         if err:
             sys.exit(f"Cannot use output directory '{outdir}': {err}")
 
-    print("Which template do you want to use?  1 / 2 / 3")
+    print("Which template do you want to use?  1 (Spandan) / 2 (Sail) / 3 (General)")
     template = ask_int("Template", 1, 3)
+
+    # Spandan: BOUND_MIN depends on the template
+    if template == 1: BOUND_MIN = 10
+    elif template == 2: BOUND_MIN = 11
+    else: BOUND_MIN = 0
 
     #addr_w = ask_int("Address bits", 1, 64, 32)
     compressed = ask_yes_no("Is compressed instruction on?", "n")
+
+    if template != 3:
+        print(f"Template {template} requires minimum {PERM_MIN} Permission bits, {OTYPE_MIN} Otype bits,", end = " ")
+        print(f"{FLAG_MIN} Flag bits and {BOUND_MIN} Bounds bits,", end = " ")
+        print(f"totalling {PERM_MIN + OTYPE_MIN + FLAG_MIN + BOUND_MIN} bits.")
+        print(f"This leaves {T12_META_BITS - (PERM_MIN + OTYPE_MIN + FLAG_MIN + BOUND_MIN)} spare bits", end = " ")
+        print(f"for Template {template}, which can be distributed between the fields.")
 
     if template == 3:
         # lower limits only; bound fixed at 64 bits
@@ -62,7 +74,7 @@ def main():
         o = ask_int(f"Otype bits (min {OTYPE_MIN})", OTYPE_MIN, T3_FIELD_MAX, 3)
         f = ask_int(f"Flag bits (min {FLAG_MIN})", FLAG_MIN, T3_FIELD_MAX, 1)
         #Sayak: Ask user for the bit length of bound
-        raw_b = ask_int(f"Bound bits (1-{T3_BOUND_MAX}, rounded up to 8/16/32/64)", 1, T3_BOUND_MAX, T3_BOUND_MAX)
+        raw_b = ask_int(f"Bound bits (0-{T3_BOUND_MAX}, rounded up to 8/16/32/64)", 0, T3_BOUND_MAX, T3_BOUND_MAX)
         bound_w = round_bound(raw_b)
         if bound_w != raw_b:
             print(f"  -> bound bits rounded up to {bound_w}")
@@ -79,7 +91,7 @@ def main():
 
         bound_w = T12_META_BITS - (p + o + f)   # Sayak: whatever is left of 32
         meta_w = T12_META_BITS                  # templates 1/2: constant 32
-        print(f"  -> bound = {bound_w} bits")
+        print(f"  -> maximum bounds bits = {bound_w} bits")
     assert meta_w % 8 == 0, "total metadata width must be divisible by 8"
     print(f"  -> total metadata = {meta_w} bits")
     # meta_w = p + o + f + bound_w
@@ -95,8 +107,10 @@ def main():
         t_max = 1 + spare // 2
         
         # Print calculations to the user before prompting for T
-        print(f"  -> Spare bits left for T and B allocation: {spare}")
-        print(f"  -> You can select T from 1 to {t_max}")
+        print(f"  -> {BOUND_RESERVED[template]} bound bits assigned according to template.")
+        print(f"  -> Spare bits left for T and B allocation: {spare} bits")
+        print(f"  -> You can select 1 to {t_max} bits for T.")
+        print(f"  -> That +2 bits will be automatically assigned to B.")
 
         t_bits = ask_limited("T", 1, t_max, t_max)
         b_fld = t_bits + 2    # B = T + 2
@@ -112,28 +126,41 @@ def main():
 
         print(f"  -> Final: T = {t_bits} bits, B = {b_fld} bits ({leftover} bits wasted)")
 
-    # user-defined perms are appended after the 12 hardware perms
+    # user-defined perms are appended after the 11 hardware perms
     max_uperm = p - HW_PERM_COUNT
     nperm = 0  # default when the prompt is skipped
     if (p > PERM_MIN): #Sayak : Give option only when user defined perm is there
-        nperm = ask_int(f"Number of user-defined perms (0-{max_uperm})", 0, max_uperm, 0)
-    perm_names = ask_names(nperm, "perm", set())
+        nperm = ask_int(f"Number of user-defined perms (<={max_uperm})", 0, max_uperm, 0)
+    perm_names_ip = ask_names(nperm, "perm", set())
+    perm_names = [nm.upper() for nm in perm_names_ip]  # all perms are upper-case
 
     # Sayak: Unsealed, Sealed, Reserved + n  and (user types must fit in 2^o values)
     max_user = (1 << o) - 3  #basically (2^0 -3)
     notype = 0  # default when the prompt is skipped
     if (o > OTYPE_MIN): #Sayak : Give option only when user defined otype is there
-        notype = ask_int(f"Number of user-defined otypes (0-{max_user})", 0, max_user, 0)
-    otype_names = ask_names(notype, "otype", set(perm_names))
+        notype = ask_int(f"Number of user-defined otypes (<={max_user})", 0, max_user, 0)
+    otype_names = ask_names(notype, "otype", set(OTYPES))
+
+    max_flag = f - FLAG_MIN
+    nflag = 0 # default when the prompt is skipped
+    if (f > FLAG_MIN): #Sayak : Give option only when user defined flag is there
+        nflag = ask_int(f"Number of user-defined flags (<={max_flag})", 0, max_flag, 0)
+    flag_names_ip = ask_names(nflag, "flag", set(FLAGS))
+    flag_names = [nm.upper() for nm in flag_names_ip]  # all flags are upper-case
 
     order = ask_order()
     widths = {"P": p, "O": o, "F": f, "B": bound_w}
-    pos = layout(order, widths)
+    if (template == 3):
+        gen_widths = {"P": type_bits(p), "O": type_bits(o), "F": type_bits(f), "B": type_bits(bound_w)}
+        pos = layout_gen(order, widths, gen_widths)
+    else:
+        pos = layout(order, widths)
 
     #Sayak : Add general_name to the cfg dictionary to be used in utils.h generation for template 3
     cfg = dict(x=x, template=template, meta_w=meta_w, addr_w= 32, compressed=compressed,
                widths=widths, order=order, pos=pos,
-               perm_names=perm_names, otype_names= otype_names, general_name= os.path.basename(args.output))
+               perm_names=perm_names, otype_names=otype_names, flag_names=flag_names, 
+               general_name= os.path.basename(args.output))
     if outdir is None:
         outdir = ask_outdir()
     general_path = os.path.join(outdir, args.output)   # an absolute -o path overrides the folder

@@ -208,12 +208,16 @@ def ask_order():
 #Sayak: Helper function added to get the user defined perms and otypes //Mich
 def ask_names(n, label, taken):
     names = []
+    names_upper = []
+    taken_upper = [nm.upper() for nm in taken]
     for i in range(n):
         while True:
             nm = input(f"  Name of user-defined {label} #{i + 1}: ").strip()
-            if re.fullmatch(r"[A-Za-z_]\w*", nm) and nm not in RESERVED_NAMES \
-                    and nm not in taken and nm not in names:
+            nm_upper = nm.upper()
+            if re.fullmatch(r"[A-Za-z_]\w*", nm) and nm_upper not in RESERVED_NAMES \
+                    and nm_upper not in taken_upper and nm_upper not in names_upper:
                 names.append(nm)
+                names_upper.append(nm_upper)
                 break
             print("  -> must be a unique valid C identifier (not already used)")
     return names
@@ -225,6 +229,15 @@ def layout(order, widths):
     for f in reversed(order):
         pos[f] = (bit, bit + widths[f] - 1)
         bit += widths[f]
+    return pos
+
+
+def layout_gen(order, widths, gen_widths):
+    """order is MSB->LSB; returns {field: (bot, top)} with bit 0 = LSB."""
+    pos, bit = {}, 0
+    for f in reversed(order):
+        pos[f] = (bit, bit + widths[f] - 1)
+        bit += gen_widths[f]
     return pos
 
 
