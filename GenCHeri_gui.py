@@ -83,6 +83,30 @@ def parse_options(vp_dir):
     found = [(n, d, v == "ON") for n, d, v in OPTION_RE.findall(text)]
     return found or None
 
+#Sayak: Colapsible button for each section
+class Section(ttk.Frame):
+    """Card with a clickable header (▾ / ▸) that collapses its body."""
+    def __init__(self, parent, title, app, expand_body=False):
+        super().__init__(parent, style="Card.TFrame")
+        self.app, self.title, self.open = app, title, True
+        self.head = tk.Label(self, text="", font=app.FS, fg=app.accent_dark, bg=app.CARD, anchor="w", cursor="hand2", padx=12, pady=8)
+        self.head.pack(fill="x")
+        self.head.bind("<Button-1>", lambda e: self.toggle())
+        self.body = ttk.Frame(self, padding=(12, 0, 12, 12))
+        self.body.pack(fill="both" if expand_body else "x", expand=expand_body)
+        self._mark()
+
+    def _mark(self):
+        self.head.configure(text=("▾  " if self.open else "▸  ") + self.title)
+
+    def toggle(self):
+        self.open = not self.open
+        if self.open:
+            self.body.pack(fill="both", expand=True)
+        else:
+            self.body.pack_forget()
+        self._mark()
+
 
 class App(tk.Tk):
     def __init__(self):
@@ -146,6 +170,7 @@ class App(tk.Tk):
         st.configure(".", font=self.F, background=self.CARD, foreground=self.FG, fieldbackground=self.CARD,
                      bordercolor=self.LINE, lightcolor=self.CARD, darkcolor=self.CARD, troughcolor=self.BG)
         st.configure("TFrame", background=self.CARD)
+        st.configure("Card.TFrame", background=self.CARD, relief="solid", borderwidth=1, bordercolor=self.LINE) #Sayak :Added for card theme
         st.configure("Page.TFrame", background=self.BG)
         st.configure("TLabel", background=self.CARD, foreground=self.FG)
         st.configure("Muted.TLabel", foreground=self.MUTED)
@@ -224,14 +249,35 @@ class App(tk.Tk):
         self.lbl_info = ttk.Label(g, text="", style="Info.TLabel")
         self.lbl_info.grid(row=2, column=2, columnspan=4, sticky="w", **pad)
 
-        ttk.Label(g, text="User-defined perms").grid(row=3, column=0, sticky="nw", **pad)
-        self.txt_perm = self._text(g, 3)
-        self.txt_perm.grid(row=3, column=1, columnspan=2, sticky="ew", **pad)
-        ttk.Label(g, text="User-defined otypes").grid(row=3, column=3, sticky="nw", **pad)
-        self.txt_otype = self._text(g, 3)
-        self.txt_otype.grid(row=3, column=4, columnspan=2, sticky="ew", **pad)
+        # # Sayak: If you have user defined perms then write in the below box
+        # ttk.Label(g, text="User-defined perms").grid(row=3, column=0, sticky="nw", **pad)
+        # self.txt_perm = self._text(g, 3)
+        # self.txt_perm.grid(row=3, column=1, columnspan=2, sticky="ew", **pad)
+
+        # # Sayak: If you have user defined otypes then write in the below box
+        # ttk.Label(g, text="User-defined otypes").grid(row=3, column=3, sticky="nw", **pad)
+        # self.txt_otype = self._text(g, 3)
+        # self.txt_otype.grid(row=3, column=4, columnspan=2, sticky="ew", **pad)
+
+        # #Sayak: If you have user defined flags then write in the below box
+        # ttk.Label(g, text="User-defined flags").grid(row=3, column=6, sticky="nw", **pad)
+        # self.txt_otype = self._text(g, 3)
+        # self.txt_otype.grid(row=3, column=4, columnspan=2, sticky="ew", **pad)
+
+        # self.lbl_names = ttk.Label(g, text="", style="Muted.TLabel")
+        # self.lbl_names.grid(row=4, column=0, columnspan=6, sticky="w", **pad)
+
+        #Sayak: Added boxed one below another
+        self.name_boxes = {}
+        for r, (key, label) in enumerate((("perm", "User-defined perms"), ("otype", "User-defined otypes"),
+                                          ("flag", "User-defined flags")), start=3):
+            ttk.Label(g, text=label).grid(row=r, column=0, sticky="nw", **pad)
+            t = self._text(g, 2)
+            t.grid(row=r, column=1, columnspan=5, sticky="ew", **pad)
+            self.name_boxes[key] = t
+        self.txt_perm, self.txt_otype, self.txt_flag = (self.name_boxes[k] for k in ("perm", "otype", "flag"))
         self.lbl_names = ttk.Label(g, text="", style="Muted.TLabel")
-        self.lbl_names.grid(row=4, column=0, columnspan=6, sticky="w", **pad)
+        self.lbl_names.grid(row=6, column=0, columnspan=6, sticky="w", **pad)
 
         ttk.Label(g, text="Staging folder").grid(row=5, column=0, sticky="w", **pad)
         ttk.Entry(g, textvariable=self.v["staging"]).grid(row=5, column=1, columnspan=4, sticky="ew", **pad)

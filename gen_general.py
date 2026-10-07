@@ -127,6 +127,7 @@ enum Otypes {{
 
 enum Flags {{
     CAP_MODE = 0,
+    // User Defined Flags apend below
 {flag_lines}}};
 
 typedef {c_type(widths['P'])} PERM; //sayak_G
