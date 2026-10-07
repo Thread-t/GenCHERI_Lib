@@ -19,22 +19,29 @@ import sys
 from gen_general import OTYPES, FLAGS, FIELD_NAMES, BOUND_RESERVED, generate, type_bits
 from gen_utils import *
 from helper import *
+from port_build import prepare_dir
 
-#Sayak: Limit macros
-PERM_MIN, OTYPE_MIN, FLAG_MIN, BOUND_MIN = 11, 2, 1, 10  # lower limits only (no upper limit)
-T3_BOUND_MAX = 64  # template 3: fixed bound width
-T12_META_BITS = 32  # templates 1/2: fixed metadata width
-T3_FIELD_MAX = 32 # Template 3 perms, otype and flag bits max width
-# Templates 1/2: number of extra bits (slack) that perm/otype/flag may consume above
-# their minimums. Each field's max depends on what the previous fields already used:
-#   perm  : PERM_MIN  <= x <= PERM_MIN  + S
-#   otype : OTYPE_MIN <= y <= OTYPE_MIN + S - (x - PERM_MIN)
-#   flag  : FLAG_MIN  <= z <= FLAG_MIN  + S - (x - PERM_MIN) - (y - OTYPE_MIN)
-T12_SLACK = {1: 8, 2: 7}  #Sayak: Template 1 has 7 bits of slack, Template 2 has 6 bits of slack
+from gen_config import (PERM_MIN, OTYPE_MIN, FLAG_MIN, T3_BOUND_MAX, T12_META_BITS,
+                        T3_FIELD_MAX, T12_SLACK)   #Sayak: limits now live in gen_config.py (shared with the GUI)
 
 
+#Sayak: header - generation only. Writes the headers into outdir (a staging folder) and returns their paths.
+# Knows nothing about the target source tree or the build; that is port_build.py (stage 2).
+def generate_headers(cfg, outdir, general_file="general.h", utils_file="cheri_utils.h"):
+    outdir, err = prepare_dir(outdir)
+    if err:
+        raise OSError(f"cannot use output directory '{outdir}': {err}")
+    cfg.setdefault("general_name", os.path.basename(general_file))   # used by #include in cheri_utils.h (template 3)
+    general_path = os.path.join(outdir, general_file)   # an absolute file path overrides the folder
+    utils_path = os.path.join(outdir, utils_file)
+    with open(general_path, "w") as fh:
+        fh.write(generate(cfg))
+    with open(utils_path, "w") as fh:
+        fh.write(generate_utils(cfg))
+    return general_path, utils_path
 
-#Sayak: Main function to orchestrate the generation of general.h and cheri_utils.h for all three templates
+
+#Sayak: Main function --> resp for the generation of general.h and cheri_utils.h for all three templates
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("-d", "--outdir", default=None,
@@ -83,7 +90,7 @@ def main():
         print(f"  -> bound = {bound_w} bits; storage PERM {sizes[0]} + OTYPE {sizes[1]} + FLAG {sizes[2]} + BOUND {sizes[3]}")
     else:
         # Templates 1/2: dynamic max limits, each depends on the earlier choices
-        # Sayak : Max possible number of slack bits for Template 1--> 7 and Template 2 --> 6
+        # Sayak : Max possible number of slack bits for Template 1--> 8 and Template 2 --> 7
         s = T12_SLACK[template]
         p = ask_limited("Perm", PERM_MIN, PERM_MIN + s, 12)
         o = ask_limited("Otype", OTYPE_MIN, OTYPE_MIN + s - (p - PERM_MIN), 3)
@@ -163,18 +170,8 @@ def main():
                general_name= os.path.basename(args.output))
     if outdir is None:
         outdir = ask_outdir()
-    general_path = os.path.join(outdir, args.output)   # an absolute -o path overrides the folder
-    utils_path = os.path.join(outdir, args.utils)
-
-    with open(general_path, "w") as fh:
-        fh.write(generate(cfg))
+    general_path, utils_path = generate_headers(cfg, outdir, args.output, args.utils)
     print(f"Wrote {general_path}  (bound width = {widths['B']})")
-    utils = generate_utils(cfg)
-    # if utils is None:
-    #     print("cheri_utils.h: not generated for template 3 yet")
-    # else:
-    with open(utils_path, "w") as fh:
-        fh.write(utils)
     print(f"Wrote {utils_path}")
     for k in order:
         print(f"  {FIELD_NAMES[k]:5s} [{pos[k][1]}:{pos[k][0]}]")

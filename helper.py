@@ -8,7 +8,7 @@ from gen_general import HW_PERMS
 
 
 DEFAULT_ORDER = "PFOB"  # written MSB -> LSB (matches the dummy header)
-HW_PERM_COUNT = len(HW_PERMS)  # 12
+HW_PERM_COUNT = len(HW_PERMS)  # 11
 RESERVED_NAMES = set(HW_PERMS) #| {"Unsealed", "Sealed", "Reserved", "CAP_MODE"}
 
 UTILS_HEAD = r"""#include <cstdint>
