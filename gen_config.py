@@ -9,7 +9,7 @@ from itertools import permutations
 from gen_general import HW_PERMS, BOUND_RESERVED, type_bits
 
 #Sayak: Limit macros (moved here from GenCHeri.py so the terminal version and the GUI use the same numbers)
-PERM_MIN, OTYPE_MIN, FLAG_MIN, BOUND_MIN = 11, 2, 1, 10  # lower limits
+PERM_MIN, OTYPE_MIN, FLAG_MIN = 12, 2, 1  # lower limits
 T3_BOUND_MAX = 64   # template 3: max bound width
 T12_META_BITS = 32  # templates 1/2: fixed metadata width
 T3_FIELD_MAX = 32   # Template 3 perms, otype and flag bits max width
@@ -18,12 +18,13 @@ T3_FIELD_MAX = 32   # Template 3 perms, otype and flag bits max width
 #   perm  : PERM_MIN  <= x <= PERM_MIN  + S
 #   otype : OTYPE_MIN <= y <= OTYPE_MIN + S - (x - PERM_MIN)
 #   flag  : FLAG_MIN  <= z <= FLAG_MIN  + S - (x - PERM_MIN) - (y - OTYPE_MIN)
-T12_SLACK = {1: 8, 2: 7}  #Spandan: Template 1 has 8 bits of slack, Template 2 has 7 bits of slack
+T12_SLACK = {1: 7, 2: 6}  #Sayak: Template 1 has 7 bits of slack, Template 2 has 6 bits of slack
 
+FIELD_LABEL = {"P": "Perm", "O": "Otype", "F": "Flag", "B": "Bound"}
 DEFAULT_ORDER = "PFOB"  # written MSB -> LSB (matches the dummy header)
 ORDERS = ["".join(p) for p in permutations("POFB")]   # all 24 possible field orders
 HW_PERM_COUNT = len(HW_PERMS)  # 12
-RESERVED_NAMES = set(HW_PERMS) #| {"Unsealed", "Sealed", "Reserved", "CAP_MODE"}
+RESERVED_NAMES = set(HW_PERMS) | {"CAP_MODE"} #| {"Unsealed", "Sealed", "Reserved", "CAP_MODE"}
 
 
 # ---- allowed ranges (lo, hi) --------------------------------------------------------------
@@ -75,6 +76,21 @@ def t_split(t_bits, spare):
     return x, t_bits + 2, spare - 2 * x
 
 
+def bound_layout(template, bound_w, t_bits=None):
+    """Inner division of the BOUND field as [(name, width)], LSB first.
+    T1: BE(2) B TE(2) T L7 IE | wasted      T2: BE(3) B TE(3) T IE | wasted      T3: one plain field."""
+    if template == 3:
+        return [("Bound", bound_w)]
+    spare, _ = t_range(template, bound_w)
+    x, b_bits, left = t_split(t_bits, spare)
+    w = 2 if template == 1 else 3
+    parts = [("BE", w), ("B", b_bits), ("TE", w), ("T", t_bits)]
+    parts += [("L7", 1), ("IE", 1)] if template == 1 else [("IE", 1)]
+    if left:
+        parts.append(("wasted", left))
+    return parts
+
+
 def layout(order, widths):
     """order is MSB->LSB; returns {field: (bot, top)} with bit 0 = LSB."""
     pos, bit = {}, 0
@@ -96,7 +112,7 @@ def _check(label, v, lo, hi):
         raise ValueError(f"{label} must be between {lo} and {hi} (got {v})")
 
 
-def build_cfg(template, compressed, p, o, f, order, perm_names=(), otype_names=(),
+def build_cfg(template, compressed, p, o, f, order, perm_names=(), otype_names=(), flag_names=(),
               bound_bits=None, t_bits=None, general_name="general.h"):
     """Validate all inputs and return the cfg dict for generate() / generate_utils().
 
@@ -126,8 +142,11 @@ def build_cfg(template, compressed, p, o, f, order, perm_names=(), otype_names=(
     max_user = (1 << o) - 3
     if len(otype_names) > max_user:
         raise ValueError(f"At most {max_user} user-defined otypes fit in {o} otype bits (got {len(otype_names)})")
+    max_flag = (1 << f) - 1     # CAP_MODE = 0, user flags take 1 .. 2^f - 1
+    if len(flag_names) > max_flag:
+        raise ValueError(f"At most {max_flag} user-defined flags fit in {f} flag bits (got {len(flag_names)})")
     seen = set()
-    for kind, names in (("perm", perm_names), ("otype", otype_names)):
+    for kind, names in (("perm", perm_names), ("otype", otype_names), ("flag", flag_names)):
         for nm in names:
             if not name_ok(nm, seen):
                 raise ValueError(f"'{nm}' is not usable as a {kind} name: it must be a unique valid C identifier "
@@ -140,4 +159,4 @@ def build_cfg(template, compressed, p, o, f, order, perm_names=(), otype_names=(
     widths = {"P": p, "O": o, "F": f, "B": bound_w}
     return dict(x=x, template=template, meta_w=meta_w, addr_w=32, compressed=compressed,
                 widths=widths, order=order, pos=layout(order, widths),
-                perm_names=list(perm_names), otype_names=list(otype_names), general_name=general_name)
+                perm_names=list(perm_names), otype_names=list(otype_names), flag_names=list(flag_names), general_name=general_name)
