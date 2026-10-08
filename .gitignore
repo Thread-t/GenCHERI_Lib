@@ -4,6 +4,7 @@ Tem*/
 tem*/
 
 # Prerequisites
+.*env
 *.d
 
 # Object files
