@@ -299,7 +299,7 @@ class App(tk.Tk):
             logo_label.image = self.logo_tk
             
         # Pack the main header ("GenCHERI") into the top row, right next to the logo
-        tk.Label(top_row, text="GenCHERI", font=self.FH, fg="#274993", bg="white").pack(side="left")
+        tk.Label(top_row, text="GenCHERI", font=self.FH, fg=self.accent, bg="white").pack(side="left")
         
         # Pack the subtitle directly into 'inner' so it falls onto the next line
         tk.Label(inner, text="CHERI capability metadata generator",
