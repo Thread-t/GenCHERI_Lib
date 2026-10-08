@@ -19,7 +19,7 @@ import sys
 from Backend.gen_general import OTYPES, FLAGS, FIELD_NAMES, BOUND_RESERVED, generate, type_bits
 from Backend.gen_utils import *
 from Backend.helper import *
-from port_build import prepare_dir
+from Backend.port_build import prepare_dir
 
 from gen_config import (PERM_MIN, OTYPE_MIN, FLAG_MIN, T3_BOUND_MAX, T12_META_BITS,
                         T3_FIELD_MAX, T12_SLACK)   #Sayak: limits now live in gen_config.py (shared with the GUI)

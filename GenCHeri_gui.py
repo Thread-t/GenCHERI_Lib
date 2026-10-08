@@ -19,7 +19,7 @@ from tkinter import font as tkfont
 
 import gen_config as C
 from Backend.GenCHeri import generate_headers
-from port_build import port_to, run_build
+from Backend.port_build import port_to, run_build
 
 #Sayak: places inside the riscv-vp tree (change here if the folder layout changes)
 DEFAULT_VP_DIR = "~/Documents/riscv-vp/vp"
@@ -281,16 +281,32 @@ class App(tk.Tk):
     def _header(self, parent):
         bar = tk.Frame(parent, bg="white", highlightthickness=0)
         bar.pack(fill="x")
+        
         inner = tk.Frame(bar, bg="white")
         inner.pack(pady=10)
+        
+        # Create a top row frame inside 'inner' for the logo and the title
+        top_row = tk.Frame(inner, bg="white")
+        top_row.pack(anchor="w")
+        
+        # Pack the logo into the top row
         if self.logo_img is not None:
-            tk.Label(inner, image=self.logo_tk, bg="white", bd=0).pack(side="left", padx=(0, 14))
-        txt = tk.Frame(inner, bg="white")
-        txt.pack(side="left")
-        tk.Label(txt, text="GenCHERI", font=self.FH, fg=self.accent_dark, bg="white").pack(anchor="center")
-        tk.Label(txt, text="CHERI capability metadata generator",
-                 font=self.F, fg=self.MUTED, bg="white").pack(anchor="center")
+            logo_label = tk.Label(top_row, image=self.logo_tk, bg="white", bd=0)
+            logo_label.pack(side="left", padx=(0, 2))
+            
+            # CRITICAL FIX: Explicitly anchor the image reference to the label widget
+            # This forces Python's garbage collector to keep the image visible.
+            logo_label.image = self.logo_tk
+            
+        # Pack the main header ("GenCHERI") into the top row, right next to the logo
+        tk.Label(top_row, text="GenCHERI", font=self.FH, fg="#274993", bg="white").pack(side="left")
+        
+        # Pack the subtitle directly into 'inner' so it falls onto the next line
+        tk.Label(inner, text="CHERI capability metadata generator",
+                font=self.F, fg=self.MUTED, bg="white").pack(anchor="w", pady=(4, 0))
+                
         tk.Frame(parent, bg=self.accent, height=3).pack(fill="x")
+
 
     def _text(self, parent, height):
         t = tk.Text(parent, height=height, width=28, font=self.FM, relief="flat", bd=0, highlightthickness=1,
