@@ -268,7 +268,7 @@ class App(tk.Tk):
         txt = tk.Frame(inner, bg="white")
         txt.pack(side="left")
         tk.Label(txt, text="GenCHERI", font=self.FH, fg=self.accent_dark, bg="white").pack(anchor="center")
-        tk.Label(txt, text="CHERI capability header generator  \u2022  port & build for riscv-vp",
+        tk.Label(txt, text="CHERI capability metadata generator",
                  font=self.F, fg=self.MUTED, bg="white").pack(anchor="center")
         tk.Frame(parent, bg=self.accent, height=3).pack(fill="x")
 
@@ -294,7 +294,7 @@ class App(tk.Tk):
         ttk.Label(g, text="Template").grid(row=0, column=0, sticky="w", **pad)
         ttk.Combobox(g, textvariable=self.v["template"], values=["1", "2", "3"], width=8,
                      state="readonly").grid(row=0, column=1, sticky="w", **pad)
-        ttk.Checkbutton(g, text="Compressed instructions on", variable=self.v["compressed"]).grid(
+        ttk.Checkbutton(g, text="Compressed instructions", variable=self.v["compressed"]).grid(
             row=0, column=2, columnspan=2, sticky="w", **pad)
         
         ttk.Label(g, text="Field order").grid(row=7, column=0, sticky="w", **pad)
@@ -323,6 +323,9 @@ class App(tk.Tk):
                                           ("flag", "User-defined flags")), start=3):
             ttk.Label(g, text=label).grid(row=r, column=0, sticky="nw", **pad)
             t = self._text(g, 2)
+            t.enter_count = 0 # Spandan
+            t.max_enter = 1 # Spandan
+            t.bind("<Return>", self._on_enter) # Spandan
             t.grid(row=r, column=1, columnspan=5, sticky="ew", **pad)
             self.name_boxes[key] = t
         self.txt_perm, self.txt_otype, self.txt_flag = (self.name_boxes[k] for k in ("perm", "otype", "flag"))
@@ -420,6 +423,13 @@ class App(tk.Tk):
         self.log.see("end")
         self.log.configure(state="disabled")
 
+    def _on_enter(self, event):
+        """Allow pressing enter only a maximum number of times"""
+        current_max = getattr(event.widget, "max_enter", 1)
+        event.widget.enter_count += 1
+        if event.widget.enter_count >= current_max:
+            self.after(10, lambda: event.widget.config(state="disabled"))  # disable the widget
+
     # ------------------------------------------------------------------ dynamic limits
     def refresh(self):
         """Recompute every allowed range from the current choices (same rules as the terminal version)."""
@@ -458,9 +468,15 @@ class App(tk.Tk):
                 self.lbl_info.configure(text=f"bound = {bw} bits, metadata = {mw} bits, spare = {spare}; "
                                              f"T = {tb}, B = {bb}, {left} wasted")
             self.lbl_names.configure(
-                text=(f"Up to {max(p - C.HW_PERM_COUNT, 0)} perm names   |   {(1 << o) - 3} otype names   |   {(1 << f) - 1} flag names (CAP_MODE = 0 is built in)"))
-            for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, o > C.OTYPE_MIN), (self.txt_flag, f > C.FLAG_MIN)):
+                text=(f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | {f-C.FLAG_MIN} flag names ) can be defined by the user"))
+            for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, ((1 << o) > 3)), (self.txt_flag, f > C.FLAG_MIN)):
                 w.configure(state="normal" if on else "disabled", bg="white" if on else "#eef0f4")
+                if w is self.txt_perm:
+                    w.max_enter = p - C.PERM_MIN if on else 1
+                elif w is self.txt_otype:
+                    w.max_enter = (1 << o) - 3 if on else 1
+                elif w is self.txt_flag:
+                    w.max_enter = f - C.FLAG_MIN if on else 1
         finally:
             self._busy_refresh = False
 
@@ -471,7 +487,7 @@ class App(tk.Tk):
             cfg = C.build_cfg(
                 t, self.v["compressed"].get(), p, o, f, self.v["order"].get(),
                 perm_names=self._names(self.txt_perm) if p > C.PERM_MIN else [],
-                otype_names=self._names(self.txt_otype) if o > C.OTYPE_MIN else [],
+                otype_names=self._names(self.txt_otype) if ((1 << o) > 3) else [],
                 flag_names=self._names(self.txt_flag) if f > C.FLAG_MIN else [],
                 bound_bits=self._int("bound") if t == 3 else None,
                 t_bits=self._int("t") if t in (1, 2) else None,
