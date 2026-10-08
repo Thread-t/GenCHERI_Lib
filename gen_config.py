@@ -105,6 +105,25 @@ def name_ok(nm, taken=()):
     """A valid, unused C identifier that does not clash with the built-in permission names."""
     return bool(re.fullmatch(r"[A-Za-z_]\w*", nm)) and nm not in RESERVED_NAMES and nm not in taken
 
+#Sayak: Function to check duplicate names across all groups and reserved names
+def find_name_problems(groups):
+    """groups = [("perm", names), ("otype", names), ("flag", names)]. Returns a list of readable problems.
+    Names are C identifiers (case-sensitive): two names must differ in at least one character, across ALL groups,
+    and must not clash with a name the generated header already defines."""
+    problems, seen = [], {}
+    for kind, names in groups:
+        for nm in names:
+            if not re.fullmatch(r"[A-Za-z_]\w*", nm):
+                problems.append(f"'{nm}' ({kind}) is not a valid C identifier")
+            elif nm in RESERVED_NAMES:
+                problems.append(f"'{nm}' ({kind}) is already defined by the generated header")
+            elif nm in seen:
+                # Find the first kind that used this name, and report the problem in a readable way.
+                where = f"twice in {kind}s" if seen[nm] == kind else f"in both {seen[nm]}s and {kind}s"
+                problems.append(f"'{nm}' is used {where}")
+            else:
+                seen[nm] = kind
+    return problems
 
 # ---- everything together -----------------------------------------------------------------------------
 def _check(label, v, lo, hi):
