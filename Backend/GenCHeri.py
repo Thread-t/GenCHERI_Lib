@@ -16,9 +16,9 @@ import os
 # import re
 import sys
 
-from gen_general import OTYPES, FLAGS, FIELD_NAMES, BOUND_RESERVED, generate, type_bits
-from gen_utils import *
-from helper import *
+from Backend.gen_general import OTYPES, FLAGS, FIELD_NAMES, BOUND_RESERVED, generate, type_bits
+from Backend.gen_utils import *
+from Backend.helper import *
 from port_build import prepare_dir
 
 from gen_config import (PERM_MIN, OTYPE_MIN, FLAG_MIN, T3_BOUND_MAX, T12_META_BITS,

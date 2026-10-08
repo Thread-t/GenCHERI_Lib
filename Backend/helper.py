@@ -4,7 +4,7 @@ Called from GenCHeri.py: Helper Functions supplier
 
 import re
 import os
-from gen_general import HW_PERMS
+from Backend.gen_general import HW_PERMS
 
 
 DEFAULT_ORDER = "PFOB"  # written MSB -> LSB (matches the dummy header)

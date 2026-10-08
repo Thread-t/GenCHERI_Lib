@@ -6,7 +6,7 @@ No input() / print() in here, so the terminal prompts (GenCHeri.py) and the tkin
 import re
 from itertools import permutations
 
-from gen_general import HW_PERMS, BOUND_RESERVED, type_bits
+from Backend.gen_general import HW_PERMS, BOUND_RESERVED, type_bits
 
 #Sayak: Limit macros (moved here from GenCHeri.py so the terminal version and the GUI use the same numbers)
 PERM_MIN, OTYPE_MIN, FLAG_MIN = 11, 2, 1  # lower limits

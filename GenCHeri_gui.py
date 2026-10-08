@@ -18,7 +18,7 @@ from tkinter import filedialog, messagebox, ttk
 from tkinter import font as tkfont
 
 import gen_config as C
-from GenCHeri import generate_headers
+from Backend.GenCHeri import generate_headers
 from port_build import port_to, run_build
 
 #Sayak: places inside the riscv-vp tree (change here if the folder layout changes)
@@ -312,7 +312,7 @@ class App(tk.Tk):
             g.columnconfigure(c, weight=1, uniform="c")
 
         ttk.Label(g, text="Template").grid(row=0, column=0, sticky="w", **pad)
-        ttk.Combobox(g, textvariable=self.v["template"], values=["1", "2", "3"], width=8,
+        ttk.Combobox(g, textvariable=self.v["template"], values=["1 (Spandan)", "2 (Sail)", "3 (General)"], width=8,
                      state="readonly").grid(row=0, column=1, sticky="w", **pad)
         ttk.Checkbutton(g, text="Compressed instructions", variable=self.v["compressed"]).grid(
             row=0, column=2, columnspan=2, sticky="w", **pad)
@@ -341,6 +341,8 @@ class App(tk.Tk):
             t.enter_count = 0 # Spandan
             t.max_enter = 1 # Spandan
             t.bind("<Return>", self._on_enter) # Spandan
+            t.bind("<BackSpace>", self._sync_enter_count) # Spandan
+            t.bind("<Delete>", self._sync_enter_count) # Spandan
             t.grid(row=r, column=1, columnspan=5, sticky="ew", **pad)
             self.name_boxes[key] = t
         self.txt_perm, self.txt_otype, self.txt_flag = (self.name_boxes[k] for k in ("perm", "otype", "flag"))
@@ -377,7 +379,7 @@ class App(tk.Tk):
             var.trace_add("write", lambda *_, n=name: self._mode_changed(n))
             self.mode_vars[name] = var
             ttk.Checkbutton(mrow, text=name, variable=var, style="Mode.Toolbutton", width=12).pack(side="left", padx=(0, 8))
-        ttk.Checkbutton(mrow, text="set the other mode OFF too", variable=self.v["explicit"]).pack(side="left", padx=(10, 0))
+        ttk.Checkbutton(mrow, text="Clear previous build", variable=self.v["explicit"]).pack(side="left", padx=(10, 0))
 
         ttk.Label(b, text="Command").grid(row=3, column=0, sticky="nw", **pad)
         self.lbl_cmd = tk.Label(b, text="", font=self.FM, bg="#f3f5f9", fg=self.FG, justify="left", anchor="w", padx=10, pady=6)
@@ -447,6 +449,14 @@ class App(tk.Tk):
         event.widget.enter_count += 1
         if event.widget.enter_count >= current_max:
             self.after(10, lambda: event.widget.config(state="disabled"))  # disable the widget
+
+    def _sync_enter_count(self, event):
+        """Sync the enter_count when the user presses backspace or delete"""
+        current_text = event.widget.get("1.0", "end-1c")
+        event.widget.enter_count = current_text.count("\n")  # count the number of lines in the text widget
+        current_max = getattr(event.widget, "max_enter", 1)
+        if event.widget.enter_count < current_max and event.widget.cget("state") == "disabled":
+            event.widget.config(state="normal")  # re-enable the widget if it was disabled
 
     def chip_tip(self, k):
         """Hover text of an order chip. Bound shows how its bits are divided (BE / B / TE / T / L7 / IE ...)."""
@@ -592,7 +602,10 @@ class App(tk.Tk):
         if not hasattr(self, "mode_vars"):
             return
         note = "" if self.mode() else "\n(select TESTRIG or QEMU to enable Port & Build)"
-        self.lbl_cmd.configure(text="cmake " + " ".join(self.cmake_args()) + " ..\nmake" + note)
+        if self.mode() == "TESTRIG":
+            self.lbl_cmd.configure(text="cmake " + " ".join(self.cmake_args()) + " ..\nmake riscv-vp" + note)
+        elif self.mode() == "QEMU":
+            self.lbl_cmd.configure(text="cmake " + " ".join(self.cmake_args()) + " ..\nmake qemu32-vp" + note)
 
     def on_port_build(self, build=True):
         if self.busy:
