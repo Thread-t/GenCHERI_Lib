@@ -30,12 +30,11 @@ GENERAL_FILE, UTILS_FILE = "general.h", "cheri_utils.h"
 DEFAULT_STAGING = "~/cheri_generated"
 SETTINGS_FILE = os.path.expanduser("~/.cheri_gui.json")
 
-#Sayak: build modes (the two buttons). Each one is the set of cmake options it switches on.
 MODES = {
     "TESTRIG": ["USE_TESTRIG=ON", "USE_RISCV_VP=ON"],
     "QEMU":    ["USE_TESTRIG=ON", "USE_QEMU=ON"],
 }
-MODE_OFF = {"TESTRIG": ["USE_QEMU=OFF"], "QEMU": ["USE_RISCV_VP=OFF"]}   # the other mode, set OFF explicitly (stale CMakeCache)
+MODE_OFF = {"TESTRIG": ["USE_QEMU=OFF"], "QEMU": ["USE_RISCV_VP=OFF"]}   # the other mode, set OFF explicitly
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LOGO_FILE = os.path.join(HERE, "GenCHERI_logo.jpg")   #Sayak: logo shown in the header / window icon
@@ -65,7 +64,6 @@ def logo_colours(img):
         return hexc(c1), hexc(c2)
     except Exception:
         return default
-
 
 
 class Tip:
@@ -122,6 +120,7 @@ class Section(ttk.Frame):
         self._mark()
 
 
+#Sayak: Drag-and-drop field order bar (Perm / Otype / Flag / Bound) for the GUI
 class OrderBar(ttk.Frame):
     """Drag-and-drop field order. Four chips (Perm / Otype / Flag / Bound), left = MSB, right = LSB.
     Drag a chip sideways; the others make room. The order string (e.g. "PFOB") is kept in `var`."""
@@ -145,7 +144,7 @@ class OrderBar(ttk.Frame):
             c.bind("<B1-Motion>", lambda e, k=k: self._move(e, k))
             c.bind("<ButtonRelease-1>", lambda e, k=k: self._release(e, k))
             self.chips[k] = c
-            if tips:      # tips(k) -> text for the hover tooltip of chip k (or None)
+            if tips:      # tips(k) -> hover text of chip k (or None)
                 Tip(c, app, lambda k=k: tips(k))
         var.trace_add("write", lambda *_: self._external())
         self._layout()
@@ -207,7 +206,8 @@ class App(tk.Tk):
             "order": tk.StringVar(value=C.DEFAULT_ORDER),
             "staging": tk.StringVar(value=DEFAULT_STAGING),
             "vp": tk.StringVar(value=DEFAULT_VP_DIR),
-            "backup": tk.BooleanVar(value=True), "explicit": tk.BooleanVar(value=True), "jobs": tk.StringVar(value=str(os.cpu_count() or 1)),
+            "backup": tk.BooleanVar(value=True), "jobs": tk.StringVar(value=str(os.cpu_count() or 1)),
+            "explicit": tk.BooleanVar(value=True),
         }
         self._load_settings()
         self._load_logo()
@@ -263,11 +263,11 @@ class App(tk.Tk):
         st.map("TSpinbox", bordercolor=[("focus", self.accent)])
         st.map("TCombobox", bordercolor=[("focus", self.accent)], fieldbackground=[("readonly", self.CARD)])
         st.configure("TCheckbutton", background=self.CARD, focuscolor=self.CARD)
+        st.map("TCheckbutton", background=[("active", self.CARD)])
         st.configure("Mode.Toolbutton", background="#eef0f6", foreground=self.FG, padding=(14, 7), anchor="center",
                      bordercolor=self.LINE, relief="flat", font=self.FB)
         st.map("Mode.Toolbutton", background=[("selected", self.accent), ("active", "#e2e6f0")],
                foreground=[("selected", "white")])
-        st.map("TCheckbutton", background=[("active", self.CARD)])
         st.configure("TButton", padding=(12, 6), background="#eef0f6", bordercolor=self.LINE, focuscolor="#eef0f6")
         st.map("TButton", background=[("active", "#e2e6f0"), ("disabled", "#f3f4f8")], foreground=[("disabled", "#a0a6b5")])
         st.configure("Accent.TButton", background=self.accent, foreground="white", font=self.FB,
@@ -288,7 +288,7 @@ class App(tk.Tk):
         txt = tk.Frame(inner, bg="white")
         txt.pack(side="left")
         tk.Label(txt, text="GenCHERI", font=self.FH, fg=self.accent_dark, bg="white").pack(anchor="center")
-        tk.Label(txt, text="CHERI capability header generator  \u2022  port & build for riscv-vp",
+        tk.Label(txt, text="CHERI capability metadata generator",
                  font=self.F, fg=self.MUTED, bg="white").pack(anchor="center")
         tk.Frame(parent, bg=self.accent, height=3).pack(fill="x")
 
@@ -314,8 +314,11 @@ class App(tk.Tk):
         ttk.Label(g, text="Template").grid(row=0, column=0, sticky="w", **pad)
         ttk.Combobox(g, textvariable=self.v["template"], values=["1", "2", "3"], width=8,
                      state="readonly").grid(row=0, column=1, sticky="w", **pad)
-        ttk.Checkbutton(g, text="Compressed instructions on", variable=self.v["compressed"]).grid(
+        ttk.Checkbutton(g, text="Compressed instructions", variable=self.v["compressed"]).grid(
             row=0, column=2, columnspan=2, sticky="w", **pad)
+        
+        ttk.Label(g, text="Field order").grid(row=7, column=0, sticky="w", **pad)
+        OrderBar(g, self, self.v["order"], tips=self.chip_tip).grid(row=7, column=1, columnspan=5, sticky="w", **pad)
 
         self.spins = {}
         for i, (key, label) in enumerate((("p", "Perm bits"), ("o", "Otype bits"), ("f", "Flag bits"))):
@@ -335,18 +338,21 @@ class App(tk.Tk):
                                           ("flag", "User-defined flags")), start=3):
             ttk.Label(g, text=label).grid(row=r, column=0, sticky="nw", **pad)
             t = self._text(g, 2)
+            t.enter_count = 0 # Spandan
+            t.max_enter = 1 # Spandan
+            t.bind("<Return>", self._on_enter) # Spandan
             t.grid(row=r, column=1, columnspan=5, sticky="ew", **pad)
             self.name_boxes[key] = t
         self.txt_perm, self.txt_otype, self.txt_flag = (self.name_boxes[k] for k in ("perm", "otype", "flag"))
         self.lbl_names = ttk.Label(g, text="", style="Muted.TLabel")
         self.lbl_names.grid(row=6, column=0, columnspan=6, sticky="w", **pad)
 
-        ttk.Label(g, text="Field order").grid(row=7, column=0, sticky="w", **pad)
-        OrderBar(g, self, self.v["order"], tips=self.chip_tip).grid(row=7, column=1, columnspan=5, sticky="w", **pad)
-
+        #Sayak: Updated the staging folder label and entry to be below the user-defined perms/otypes/flags text boxes
         ttk.Label(g, text="Staging folder").grid(row=8, column=0, sticky="w", **pad)
         ttk.Entry(g, textvariable=self.v["staging"]).grid(row=8, column=1, columnspan=4, sticky="ew", **pad)
         ttk.Button(g, text="Browse\u2026", command=lambda: self._browse("staging")).grid(row=8, column=5, sticky="e", **pad)
+
+        #Sayak: Updated the generate headers button and label to be below the staging folder entry
         self.btn_gen = ttk.Button(g, text="\u2699  Generate headers", style="Accent.TButton", command=self.on_generate)
         self.btn_gen.grid(row=9, column=0, columnspan=2, sticky="w", padx=6, pady=(10, 2))
         self.lbl_gen = ttk.Label(g, text="Nothing generated yet.", style="Muted.TLabel")
@@ -435,6 +441,13 @@ class App(tk.Tk):
         self.log.see("end")
         self.log.configure(state="disabled")
 
+    def _on_enter(self, event):
+        """Allow pressing enter only a maximum number of times"""
+        current_max = getattr(event.widget, "max_enter", 1)
+        event.widget.enter_count += 1
+        if event.widget.enter_count >= current_max:
+            self.after(10, lambda: event.widget.config(state="disabled"))  # disable the widget
+
     def chip_tip(self, k):
         """Hover text of an order chip. Bound shows how its bits are divided (BE / B / TE / T / L7 / IE ...)."""
         t, p, o, f = (self._int(x) for x in ("template", "p", "o", "f"))
@@ -446,7 +459,8 @@ class App(tk.Tk):
             bw, _, _ = C.bound_and_meta(t, p, o, f, raw)
             parts = C.bound_layout(t, bw, self._int("t") if t in (1, 2) else None)
             order, widths = list(self.v["order"].get()), {"P": p, "O": o, "F": f, "B": bw}
-            lo = C.layout(order, widths)["B"][0]            # absolute bit of the bound field's bottom
+            lo = C.layout(order, widths)["B"][0]
+            # absolute bit of the bound field's bottom
         except Exception:
             return None
         lines, bit = [], lo
@@ -490,7 +504,10 @@ class App(tk.Tk):
             else:
                 bw, mw, _ = C.bound_and_meta(t, p, o, f)
                 spare, tmax = C.t_range(t, bw)
-                self.lbl_extra.configure(text=f"T bits (1-{tmax})")
+                if tmax == 1:
+                    self.lbl_extra.configure(text=f"T bits (1)")
+                else:
+                    self.lbl_extra.configure(text=f"T bits (1-{tmax})")
                 self.sb_extra.configure(textvariable=self.v["t"], from_=1, to=tmax)
                 tb = self._int("t")
                 if tb is None or tb < 1: self.v["t"].set("1"); tb = 1
@@ -499,10 +516,16 @@ class App(tk.Tk):
                 self.lbl_info.configure(text=f"bound = {bw} bits, metadata = {mw} bits, spare = {spare}; "
                                              f"T = {tb}, B = {bb}, {left} wasted")
             self.refresh_cmd()
-            self.lbl_names.configure(
-                text=(f"Up to {max(p - C.HW_PERM_COUNT, 0)} perm names   |   {(1 << o) - 3} otype names   |   {(1 << f) - 1} flag names (CAP_MODE = 0 is built in)"))
-            for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, o > C.OTYPE_MIN), (self.txt_flag, f > C.FLAG_MIN)):
+            self.lbl_names.configure( 
+                text=(f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | {f-C.FLAG_MIN} flag names ) can be defined by the user"))
+            for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, ((1 << o) > 3)), (self.txt_flag, f > C.FLAG_MIN)):
                 w.configure(state="normal" if on else "disabled", bg="white" if on else "#eef0f4")
+                if w is self.txt_perm:
+                    w.max_enter = p - C.PERM_MIN if on else 1
+                elif w is self.txt_otype:
+                    w.max_enter = (1 << o) - 3 if on else 1
+                elif w is self.txt_flag:
+                    w.max_enter = f - C.FLAG_MIN if on else 1
         finally:
             self._busy_refresh = False
 
@@ -513,7 +536,7 @@ class App(tk.Tk):
             cfg = C.build_cfg(
                 t, self.v["compressed"].get(), p, o, f, self.v["order"].get(),
                 perm_names=self._names(self.txt_perm) if p > C.PERM_MIN else [],
-                otype_names=self._names(self.txt_otype) if o > C.OTYPE_MIN else [],
+                otype_names=self._names(self.txt_otype) if ((1 << o) > 3) else [],
                 flag_names=self._names(self.txt_flag) if f > C.FLAG_MIN else [],
                 bound_bits=self._int("bound") if t == 3 else None,
                 t_bits=self._int("t") if t in (1, 2) else None,
@@ -544,7 +567,8 @@ class App(tk.Tk):
         self.refresh_cmd()
 
     def _mode_changed(self, name):
-        if self.mode_vars[name].get():            # buttons are exclusive: turning one on turns the other off
+        if self.mode_vars[name].get():
+            # buttons are exclusive: turning one on turns the other off
             for n, v in self.mode_vars.items():
                 if n != name:
                     v.set(False)

@@ -9,7 +9,7 @@ from itertools import permutations
 from gen_general import HW_PERMS, BOUND_RESERVED, type_bits
 
 #Sayak: Limit macros (moved here from GenCHeri.py so the terminal version and the GUI use the same numbers)
-PERM_MIN, OTYPE_MIN, FLAG_MIN = 12, 2, 1  # lower limits
+PERM_MIN, OTYPE_MIN, FLAG_MIN = 11, 2, 1  # lower limits
 T3_BOUND_MAX = 64   # template 3: max bound width
 T12_META_BITS = 32  # templates 1/2: fixed metadata width
 T3_FIELD_MAX = 32   # Template 3 perms, otype and flag bits max width
@@ -18,7 +18,7 @@ T3_FIELD_MAX = 32   # Template 3 perms, otype and flag bits max width
 #   perm  : PERM_MIN  <= x <= PERM_MIN  + S
 #   otype : OTYPE_MIN <= y <= OTYPE_MIN + S - (x - PERM_MIN)
 #   flag  : FLAG_MIN  <= z <= FLAG_MIN  + S - (x - PERM_MIN) - (y - OTYPE_MIN)
-T12_SLACK = {1: 7, 2: 6}  #Sayak: Template 1 has 7 bits of slack, Template 2 has 6 bits of slack
+T12_SLACK = {1: 8, 2: 7}  #Sayak: Template 1 has 8 bits of slack, Template 2 has 7 bits of slack
 
 FIELD_LABEL = {"P": "Perm", "O": "Otype", "F": "Flag", "B": "Bound"}
 DEFAULT_ORDER = "PFOB"  # written MSB -> LSB (matches the dummy header)
