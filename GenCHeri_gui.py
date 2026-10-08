@@ -362,6 +362,14 @@ class App(tk.Tk):
             t.grid(row=r, column=1, columnspan=5, sticky="ew", **pad)
             self.name_boxes[key] = t
         self.txt_perm, self.txt_otype, self.txt_flag = (self.name_boxes[k] for k in ("perm", "otype", "flag"))
+
+        #Sayak_latest: Added bindings for live name checking
+        for t in (self.txt_perm, self.txt_otype, self.txt_flag):
+            t.bind("<KeyRelease>", self._check_names, add="+")
+            t.bind("<<Paste>>", lambda e: self.after_idle(self._check_names), add="+")
+            #Sayak_latest: a duplicate / reserved name cannot be finished with space, comma or semicolon
+            t.bind("<KeyPress>", lambda e: "break" if e.char in (" ", ",", ";") and self._block_bad_name(e) else None, add="+")
+        
         self.lbl_names = ttk.Label(g, text="", style="Muted.TLabel")
         self.lbl_names.grid(row=6, column=0, columnspan=6, sticky="w", **pad)
 
@@ -461,6 +469,8 @@ class App(tk.Tk):
 
     def _on_enter(self, event):
         """Allow pressing enter only a maximum number of times"""
+        if self._block_bad_name(event):       #Sayak_latest: duplicate / reserved name -> Enter refused
+            return "break"
         current_max = getattr(event.widget, "max_enter", 1)
         event.widget.enter_count += 1
         if event.widget.enter_count >= current_max:
@@ -473,6 +483,44 @@ class App(tk.Tk):
         current_max = getattr(event.widget, "max_enter", 1)
         if event.widget.enter_count < current_max and event.widget.cget("state") == "disabled":
             event.widget.config(state="normal")  # re-enable the widget if it was disabled
+
+    #Sayak_latest: Added a method to get the active names from the text boxes, considering only the enabled boxes.
+    def _active_names(self):
+        """Names of the three boxes, but only the boxes that are enabled (a disabled box may still hold old text)."""
+        p, o, f = (self._int(k) for k in ("p", "o", "f"))
+        on = {"perm": p is not None and p > C.PERM_MIN,
+              "otype": o is not None and (1 << o) > 3,
+              "flag": f is not None and f > C.FLAG_MIN}
+        boxes = {"perm": self.txt_perm, "otype": self.txt_otype, "flag": self.txt_flag}
+        return {k: (self._names(boxes[k]) if on[k] else []) for k in boxes}
+
+    def _check_names(self, event=None):
+        """Live duplicate / clash check shown in the hint line under the boxes (red while there is a problem)."""
+        n = self._active_names()
+        probs = C.find_name_problems([("perm", n["perm"]), ("otype", n["otype"]), ("flag", n["flag"])])
+        if probs:
+            self.lbl_names.configure(text="⚠ " + "   |   ".join(probs[:3]) + ("   …" if len(probs) > 3 else ""),
+                                     foreground="#c0392b")
+        else:
+            self.lbl_names.configure(text=getattr(self, "_hint", ""), foreground=self.MUTED)
+        return probs
+
+    def _block_bad_name(self, event):
+        """True (and warns) if the name being typed is a duplicate of / clashes with another name."""
+        w = event.widget
+        cur = re.split(r"[\s,;]+", w.get("1.0", "end-1c"))[-1]              # name after the last separator
+        if not cur:
+            return False
+        kind = next(k for k, b in self.name_boxes.items() if b is w)
+        names = self._active_names()
+        names[kind] = names[kind][:-1]                                      # all the other names
+        groups = [(k, names[k]) for k in ("perm", "otype", "flag")]
+        found = C.find_name_problems(groups + [(kind, [cur])])
+        if len(found) == len(C.find_name_problems(groups)):
+            return False
+        self.bell()
+        self.lbl_names.configure(text="\u26d4 " + found[-1], foreground="#c0392b")
+        return True
 
     def chip_tip(self, k):
         """Hover text of an order chip. Bound shows how its bits are divided (BE / B / TE / T / L7 / IE ...)."""
@@ -541,9 +589,14 @@ class App(tk.Tk):
                 x, bb, left = C.t_split(tb, spare)
                 self.lbl_info.configure(text=f"bound = {bw} bits, metadata = {mw} bits, spare = {spare}; "
                                              f"T = {tb}, B = {bb}, {left} wasted")
-            self.refresh_cmd()
-            self.lbl_names.configure( 
-                text=(f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | {f-C.FLAG_MIN} flag names ) can be defined by the user"))
+            self.refresh_cmd() 
+            # self.lbl_names.configure( 
+            #     text=(f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | {f-C.FLAG_MIN} flag names ) can be defined by the user"))
+            
+            self._hint = (f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | "
+                f"{f - C.FLAG_MIN} flag names ) can be defined by the user")
+            self._check_names()
+
             for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, ((1 << o) > 3)), (self.txt_flag, f > C.FLAG_MIN)):
                 w.configure(state="normal" if on else "disabled", bg="white" if on else "#eef0f4")
                 if w is self.txt_perm:
@@ -555,15 +608,16 @@ class App(tk.Tk):
         finally:
             self._busy_refresh = False
 
-    # ------------------------------------------------------------------ stage 1
+    # ----------------------Sayak -------------------------------------------- stage 1
     def on_generate(self):
         try:
             t, p, o, f = (self._int(k) for k in ("template", "p", "o", "f"))
+            names = self._active_names()                      # <- NEW line
             cfg = C.build_cfg(
                 t, self.v["compressed"].get(), p, o, f, self.v["order"].get(),
-                perm_names=self._names(self.txt_perm) if p > C.PERM_MIN else [],
-                otype_names=self._names(self.txt_otype) if ((1 << o) > 3) else [],
-                flag_names=self._names(self.txt_flag) if f > C.FLAG_MIN else [],
+                perm_names=names["perm"],                     # <- changed
+                otype_names=names["otype"],                   # <- changed
+                flag_names=names["flag"],                     # <- changed
                 bound_bits=self._int("bound") if t == 3 else None,
                 t_bits=self._int("t") if t in (1, 2) else None,
                 general_name=GENERAL_FILE)

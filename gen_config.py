@@ -24,7 +24,9 @@ FIELD_LABEL = {"P": "Perm", "O": "Otype", "F": "Flag", "B": "Bound"}
 DEFAULT_ORDER = "PFOB"  # written MSB -> LSB (matches the dummy header)
 ORDERS = ["".join(p) for p in permutations("POFB")]   # all 24 possible field orders
 HW_PERM_COUNT = len(HW_PERMS)  # 12
-RESERVED_NAMES = set(HW_PERMS) | {"CAP_MODE"} #| {"Unsealed", "Sealed", "Reserved", "CAP_MODE"}
+
+# Sayak: reserved names for the permission fields --> Check for duplicates across all groups (perm, otype, flag) and reserved names
+RESERVED_NAMES = set(HW_PERMS) | {"Unsealed", "Sealed", "Reserved", "CAP_MODE"}
 
 
 # ---- allowed ranges (lo, hi) --------------------------------------------------------------
@@ -161,16 +163,21 @@ def build_cfg(template, compressed, p, o, f, order, perm_names=(), otype_names=(
     max_user = (1 << o) - 3
     if len(otype_names) > max_user:
         raise ValueError(f"At most {max_user} user-defined otypes fit in {o} otype bits (got {len(otype_names)})")
-    max_flag = (1 << f) - 1     # CAP_MODE = 0, user flags take 1 .. 2^f - 1
+    max_flag = {f - FLAG_MIN } #(1 << f) - 1     # CAP_MODE = 0, user flags take 1 .. 2^f - 1
     if len(flag_names) > max_flag:
         raise ValueError(f"At most {max_flag} user-defined flags fit in {f} flag bits (got {len(flag_names)})")
-    seen = set()
-    for kind, names in (("perm", perm_names), ("otype", otype_names), ("flag", flag_names)):
-        for nm in names:
-            if not name_ok(nm, seen):
-                raise ValueError(f"'{nm}' is not usable as a {kind} name: it must be a unique valid C identifier "
-                                 "that is not already used")
-            seen.add(nm)
+    
+    #Sayak: Check for duplicate names across all groups and reserved names
+    problems = find_name_problems([("perm", perm_names), ("otype", otype_names), ("flag", flag_names)])
+    if problems:
+        raise ValueError("\n".join(problems))
+    # seen = set()
+    # for kind, names in (("perm", perm_names), ("otype", otype_names), ("flag", flag_names)):
+    #     for nm in names:
+    #         if not name_ok(nm, seen):
+    #             raise ValueError(f"'{nm}' is not usable as a {kind} name: it must be a unique valid C identifier "
+    #                              "that is not already used")
+    # seen.add(nm)
 
     if sorted(order) != sorted("POFB"):
         raise ValueError("Field order must use each of P, O, F, B exactly once")
