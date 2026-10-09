@@ -22,10 +22,10 @@ from Backend.GenCHeri import generate_headers
 from Backend.port_build import port_to, run_build
 
 #Sayak: places inside the riscv-vp tree (change here if the folder layout changes)
-DEFAULT_VP_DIR = "~/Documents/riscv-vp/vp"
-GEN_DIR_IN_VP = os.path.join("src", "core", "GenCHERI")   # general.h goes here
+DEFAULT_VP_DIR = "~/Documents/riscv-vp"
+GEN_DIR_IN_VP = os.path.join("vp", "src", "core", "GenCHERI")   # general.h goes here
 TEMPLATE_DIR_FMT = "Template{n}"                           # cheri_utils.h goes into GEN_DIR/Template<n>
-BUILD_DIR_IN_VP = "build"
+BUILD_DIR_IN_VP = "vp/build"
 GENERAL_FILE, UTILS_FILE = "general.h", "cheri_utils.h"
 DEFAULT_STAGING = "~/cheri_generated"
 SETTINGS_FILE = os.path.expanduser("~/.cheri_gui.json")
@@ -200,7 +200,7 @@ class App(tk.Tk):
         self._saved_mode = None
 
         v = self.v = {
-            "template": tk.StringVar(value="1"), "compressed": tk.BooleanVar(value=False),
+            "template": tk.StringVar(value="1 (Spandan)"), "compressed": tk.BooleanVar(value=False),
             "p": tk.StringVar(value="12"), "o": tk.StringVar(value="3"), "f": tk.StringVar(value="1"),
             "bound": tk.StringVar(value="64"), "t": tk.StringVar(value="1"),
             "order": tk.StringVar(value=C.DEFAULT_ORDER),
@@ -357,6 +357,10 @@ class App(tk.Tk):
             t.enter_count = 0 # Spandan
             t.max_enter = 1 # Spandan
             t.bind("<Return>", self._on_enter) # Spandan
+            t.bind(",", self._on_enter) # Spandan
+            t.bind(";", self._on_enter) # Spandan
+            t.bind("<Tab>", self._on_enter) # Spandan
+            t.bind("<space>", self._on_enter) # Spandan
             t.bind("<BackSpace>", self._sync_enter_count) # Spandan
             t.bind("<Delete>", self._sync_enter_count) # Spandan
             t.grid(row=r, column=1, columnspan=5, sticky="ew", **pad)
@@ -368,7 +372,7 @@ class App(tk.Tk):
             t.bind("<KeyRelease>", self._check_names, add="+")
             t.bind("<<Paste>>", lambda e: self.after_idle(self._check_names), add="+")
             #Sayak_latest: a duplicate / reserved name cannot be finished with space, comma or semicolon
-            t.bind("<KeyPress>", lambda e: "break" if e.char in (" ", ",", ";") and self._block_bad_name(e) else None, add="+")
+            t.bind("<KeyPress>", lambda e: "break" if e.char in (" ", ",", ";", "\t", "\n") and self._block_bad_name(e) else None, add="+")
         
         self.lbl_names = ttk.Label(g, text="", style="Muted.TLabel")
         self.lbl_names.grid(row=6, column=0, columnspan=6, sticky="w", **pad)
@@ -403,7 +407,7 @@ class App(tk.Tk):
             var.trace_add("write", lambda *_, n=name: self._mode_changed(n))
             self.mode_vars[name] = var
             ttk.Checkbutton(mrow, text=name, variable=var, style="Mode.Toolbutton", width=12).pack(side="left", padx=(0, 8))
-        ttk.Checkbutton(mrow, text="Clear previous build", variable=self.v["explicit"]).pack(side="left", padx=(10, 0))
+        ttk.Checkbutton(mrow, text="Show all cmake arguments", variable=self.v["explicit"]).pack(side="left", padx=(10, 0))
 
         ttk.Label(b, text="Command").grid(row=3, column=0, sticky="nw", **pad)
         self.lbl_cmd = tk.Label(b, text="", font=self.FM, bg="#f3f5f9", fg=self.FG, justify="left", anchor="w", padx=10, pady=6)
@@ -435,7 +439,9 @@ class App(tk.Tk):
     # ------------------------------------------------------------------ helpers
     def _int(self, key):
         try:
-            return int(self.v[key].get())
+            choice = self.v[key].get()
+            choice_items = choice.split()
+            return int(choice_items[0]) if choice_items else None
         except ValueError:
             return None
 
@@ -473,13 +479,16 @@ class App(tk.Tk):
             return "break"
         current_max = getattr(event.widget, "max_enter", 1)
         event.widget.enter_count += 1
+        #print(event.widget.enter_count)
         if event.widget.enter_count >= current_max:
             self.after(10, lambda: event.widget.config(state="disabled"))  # disable the widget
 
     def _sync_enter_count(self, event):
         """Sync the enter_count when the user presses backspace or delete"""
         current_text = event.widget.get("1.0", "end-1c")
-        event.widget.enter_count = current_text.count("\n")  # count the number of lines in the text widget
+        all_matches = re.findall(r"[\s,;]", current_text)
+        #print(len(all_matches))
+        event.widget.enter_count = len(all_matches)
         current_max = getattr(event.widget, "max_enter", 1)
         if event.widget.enter_count < current_max and event.widget.cget("state") == "disabled":
             event.widget.config(state="normal")  # re-enable the widget if it was disabled
@@ -593,8 +602,7 @@ class App(tk.Tk):
             # self.lbl_names.configure( 
             #     text=(f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | {f-C.FLAG_MIN} flag names ) can be defined by the user"))
             
-            self._hint = (f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | "
-                f"{f - C.FLAG_MIN} flag names ) can be defined by the user")
+            self._hint = (f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | {f - C.FLAG_MIN} flag names ) can be defined by the user")
             self._check_names()
 
             for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, ((1 << o) > 3)), (self.txt_flag, f > C.FLAG_MIN)):
@@ -605,6 +613,10 @@ class App(tk.Tk):
                     w.max_enter = (1 << o) - 3 if on else 1
                 elif w is self.txt_flag:
                     w.max_enter = f - C.FLAG_MIN if on else 1
+                if w.max_enter < w.enter_count:
+                    w.delete("1.0", "end"); w.enter_count = 0
+                elif w.max_enter == w.enter_count and w.cget("state") == "normal":
+                    w.config(state="disabled")
         finally:
             self._busy_refresh = False
 
@@ -613,11 +625,13 @@ class App(tk.Tk):
         try:
             t, p, o, f = (self._int(k) for k in ("template", "p", "o", "f"))
             names = self._active_names()                      # <- NEW line
+            p_list = [nm.upper() for nm in names["perm"]]
+            f_list = [nm.upper() for nm in names["flag"]]
             cfg = C.build_cfg(
                 t, self.v["compressed"].get(), p, o, f, self.v["order"].get(),
-                perm_names=names["perm"],                     # <- changed
-                otype_names=names["otype"],                   # <- changed
-                flag_names=names["flag"],                     # <- changed
+                perm_names = p_list,                     # <- changed
+                otype_names = names["otype"],            # <- changed
+                flag_names = f_list,                     # <- changed
                 bound_bits=self._int("bound") if t == 3 else None,
                 t_bits=self._int("t") if t in (1, 2) else None,
                 general_name=GENERAL_FILE)
@@ -695,12 +709,18 @@ class App(tk.Tk):
                                    + ("\n\nand then run cmake + make?" if build else "?")):
             return
         args, jobs, backup = self.cmake_args(), self._int("jobs"), self.v["backup"].get()
+        if self.mode() == "TESTRIG":
+            target = "riscv-vp"
+        elif self.mode() == "QEMU":
+            target = "qemu32-vp"
+        else:
+            target = "all"
         self.busy = True
         for w in (self.btn_build, self.btn_port, self.btn_gen):
             w.state(["disabled"])
-        threading.Thread(target=self._worker, args=(gp, up, gen, tdir, bdir, args, jobs, backup, build), daemon=True).start()
+        threading.Thread(target=self._worker, args=(gp, up, gen, tdir, bdir, args, target, jobs, backup, build), daemon=True).start()
 
-    def _worker(self, gp, up, gen, tdir, bdir, args, jobs, backup, build):
+    def _worker(self, gp, up, gen, tdir, bdir, args, target, jobs, backup, build):
         ok = False
         try:
             copied, backups = port_to([(gp, gen), (up, tdir)], backup=backup)
@@ -708,7 +728,7 @@ class App(tk.Tk):
                 self.say(f"Ported {c}")
             for bk in backups:
                 self.say(f"  (previous version saved as {bk})")
-            ok = run_build(bdir, args, jobs, log=self.say) if build else True
+            ok = run_build(bdir, args, target, jobs, log=self.say) if build else True
         except OSError as e:
             self.say(f"Port failed: {e}")
         self.q.put(("done", ok if build else None))

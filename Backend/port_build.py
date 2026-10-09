@@ -67,7 +67,7 @@ def port_headers(files, dst_dir, backup=True):
     return port_to([(f, dst_dir) for f in files], backup)
 
 #Sayak : added function for building the project for that we need to port the generated headers into the source tree and then build the project using cmake and make.
-def run_build(build_dir, cmake_args=(), jobs=None, log=print):
+def run_build(build_dir, cmake_args=(), target=None, jobs=None, log=print):
     """Run `cmake ..` and then `make` inside build_dir (created if missing).
 
     Every output line is passed to log(), so a terminal can use print and a GUI can append
@@ -77,7 +77,7 @@ def run_build(build_dir, cmake_args=(), jobs=None, log=print):
     if err:
         log(f"  -> cannot use build directory '{bdir}': {err}")
         return False
-    steps = [["cmake"] + list(cmake_args) + [".."], ["make"] + ([f"-j{jobs}"] if jobs else [])]
+    steps = [["cmake"] + list(cmake_args) + [".."], ["make"] + [target] + ([f"-j{jobs}"] if jobs else [])]
     for cmd in steps:
         log(f"$ {' '.join(cmd)}    (in {bdir})")
         try:
@@ -114,7 +114,7 @@ def main():
         print(f"  (previous version saved as {b})")
 
     if args.build_dir:
-        if not run_build(args.build_dir, args.cmake_arg, jobs=args.jobs):
+        if not run_build(args.build_dir, args.cmake_arg, target="all", jobs=args.jobs):
             sys.exit("Build failed")
         print("Build finished")
 

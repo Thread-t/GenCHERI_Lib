@@ -58,7 +58,7 @@ python3 GenCHeri_gui.py
 1. **Generate headers**
    Choose the template, bit widths, optional user-defined perms/otypes and the field order, pick a staging folder and press **Generate headers**.
 2. **Port into riscv-vp and build**
-   Select the VP folder: the `vp` directory of your riscv-vp checkout (the one that contains `CMakeLists.txt`, `src/` and `build/`), for example `~/Documents/riscv-vp/vp`.
+   Select the VP folder: your riscv-vp checkout, for example `~/Documents/riscv-vp/`.
    Tick the CMake options you need and press **Port & Build**.
 
 Porting goes to:

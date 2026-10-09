@@ -7,6 +7,7 @@ import re
 from itertools import permutations
 
 from Backend.gen_general import HW_PERMS, BOUND_RESERVED, type_bits
+from Backend.helper import layout_gen
 
 #Sayak: Limit macros (moved here from GenCHeri.py so the terminal version and the GUI use the same numbers)
 PERM_MIN, OTYPE_MIN, FLAG_MIN = 11, 2, 1  # lower limits
@@ -26,7 +27,7 @@ ORDERS = ["".join(p) for p in permutations("POFB")]   # all 24 possible field or
 HW_PERM_COUNT = len(HW_PERMS)  # 12
 
 # Sayak: reserved names for the permission fields --> Check for duplicates across all groups (perm, otype, flag) and reserved names
-RESERVED_NAMES = set(HW_PERMS) | {"Unsealed", "Sealed", "Reserved", "CAP_MODE"}
+RESERVED_NAMES = set(HW_PERMS) | {"UNSEALED", "SEALED", "RESERVED", "CAP_MODE"}
 
 
 # ---- allowed ranges (lo, hi) --------------------------------------------------------------
@@ -105,26 +106,28 @@ def layout(order, widths):
 # ---- user-defined names ------------------------------------------------------------------------
 def name_ok(nm, taken=()):
     """A valid, unused C identifier that does not clash with the built-in permission names."""
-    return bool(re.fullmatch(r"[A-Za-z_]\w*", nm)) and nm not in RESERVED_NAMES and nm not in taken
+    nm_upper = nm.upper()
+    return bool(re.fullmatch(r"[A-Za-z_]\w*", nm)) and nm_upper not in RESERVED_NAMES and nm_upper not in taken
 
 #Sayak: Function to check duplicate names across all groups and reserved names
 def find_name_problems(groups):
     """groups = [("perm", names), ("otype", names), ("flag", names)]. Returns a list of readable problems.
-    Names are C identifiers (case-sensitive): two names must differ in at least one character, across ALL groups,
+    Names are C identifiers: two names must differ in at least one character, across ALL groups,
     and must not clash with a name the generated header already defines."""
     problems, seen = [], {}
     for kind, names in groups:
         for nm in names:
+            nm_upper = nm.upper()
             if not re.fullmatch(r"[A-Za-z_]\w*", nm):
                 problems.append(f"'{nm}' ({kind}) is not a valid C identifier")
-            elif nm in RESERVED_NAMES:
+            elif nm_upper in RESERVED_NAMES:
                 problems.append(f"'{nm}' ({kind}) is already defined by the generated header")
-            elif nm in seen:
+            elif nm_upper in seen:
                 # Find the first kind that used this name, and report the problem in a readable way.
-                where = f"twice in {kind}s" if seen[nm] == kind else f"in both {seen[nm]}s and {kind}s"
+                where = f"twice in {kind}s" if seen[nm_upper] == kind else f"in both {seen[nm_upper]}s and {kind}s"
                 problems.append(f"'{nm}' is used {where}")
             else:
-                seen[nm] = kind
+                seen[nm_upper] = kind
     return problems
 
 # ---- everything together -----------------------------------------------------------------------------
@@ -163,7 +166,7 @@ def build_cfg(template, compressed, p, o, f, order, perm_names=(), otype_names=(
     max_user = (1 << o) - 3
     if len(otype_names) > max_user:
         raise ValueError(f"At most {max_user} user-defined otypes fit in {o} otype bits (got {len(otype_names)})")
-    max_flag = {f - FLAG_MIN } #(1 << f) - 1     # CAP_MODE = 0, user flags take 1 .. 2^f - 1
+    max_flag = f - FLAG_MIN # CAP_MODE=0, other flags take 1..(f-1)
     if len(flag_names) > max_flag:
         raise ValueError(f"At most {max_flag} user-defined flags fit in {f} flag bits (got {len(flag_names)})")
     
@@ -183,6 +186,14 @@ def build_cfg(template, compressed, p, o, f, order, perm_names=(), otype_names=(
         raise ValueError("Field order must use each of P, O, F, B exactly once")
 
     widths = {"P": p, "O": o, "F": f, "B": bound_w}
+    if template == 3:
+        gen_widths = {"P": type_bits(p), "O": type_bits(o), "F": type_bits(f), "B": type_bits(bound_w)}
+        return dict(x=x, template=template, meta_w=meta_w, addr_w=32, compressed=compressed,
+                        widths=widths, order=order, pos=layout_gen(order, widths, gen_widths),
+                        perm_names=list(perm_names), otype_names=list(otype_names), flag_names=list(flag_names), general_name=general_name)
+    
     return dict(x=x, template=template, meta_w=meta_w, addr_w=32, compressed=compressed,
                 widths=widths, order=order, pos=layout(order, widths),
                 perm_names=list(perm_names), otype_names=list(otype_names), flag_names=list(flag_names), general_name=general_name)
+
+    
