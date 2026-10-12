@@ -77,7 +77,7 @@ def run_build(build_dir, cmake_args=(), target=None, jobs=None, log=print):
     if err:
         log(f"  -> cannot use build directory '{bdir}': {err}")
         return False
-    steps = [["cmake"] + list(cmake_args) + [".."], ["make"] + [target] + ([f"-j{jobs}"] if jobs else [])]
+    steps = [["rm", "-rf", "*"], ["cmake"] + list(cmake_args) + [".."], ["make"] + [target] + ([f"-j{jobs}"] if jobs else [])]
     for cmd in steps:
         log(f"$ {' '.join(cmd)}    (in {bdir})")
         try:
