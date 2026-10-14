@@ -6,16 +6,16 @@
 #ifndef _CHERI_UTILS
 #define _CHERI_UTILS
 
-#define CAP_IE 19
-//#define CAP_L7 19
-#define CAP_TE_TOP 15
-#define CAP_TE_BOT 13
-#define CAP_T_TOP 18
-#define CAP_T_BOT 16
-#define CAP_BE_TOP 7
-#define CAP_BE_BOT 5
-#define CAP_B_TOP 12
-#define CAP_B_BOT 8
+#define CAP_IE 14
+//#define CAP_L7 14
+#define CAP_TE_TOP 10
+#define CAP_TE_BOT 8
+#define CAP_T_TOP 13
+#define CAP_T_BOT 11
+#define CAP_BE_TOP 2
+#define CAP_BE_BOT 0
+#define CAP_B_TOP 7
+#define CAP_B_BOT 3
 #define R_TOP CAP_B_TOP
 #define R_BOT (R_TOP - 2)
 #define REG_FIELD_LEN 5 // Register field in an instruction

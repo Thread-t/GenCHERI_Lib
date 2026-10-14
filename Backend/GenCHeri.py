@@ -142,7 +142,7 @@ def main():
     perm_names = [nm.upper() for nm in perm_names_ip]  # all perms are upper-case
 
     # Sayak: Unsealed, Sealed, Reserved + n  and (user types must fit in 2^o values)
-    max_user = (1 << o) - 3  #basically (2^0 -3)
+    max_user = (1 << o) - 4  #basically (2^o - 4)
     notype = 0  # default when the prompt is skipped
     if (o > OTYPE_MIN): #Sayak : Give option only when user defined otype is there
         notype = ask_int(f"Number of user-defined otypes (<={max_user})", 0, max_user, 0)

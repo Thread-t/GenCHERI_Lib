@@ -70,7 +70,7 @@ def generate(cfg):
     hw_lines = "".join(f"\t{nm},\n" if i else f"\t{nm} = 0,\n" for i, nm in enumerate(HW_PERMS))
     #Sayak: Add user defined Perms after hard coded perms
     hw_lines += "".join(f"\t{nm}, // user-defined\n" for nm in cfg["perm_names"])
-    otype_lines = "".join(f"\t{nm} = Unsealed - {i + 3},\n" for i, nm in enumerate(cfg["otype_names"]))
+    otype_lines = "".join(f"\t{nm} = Unsealed - {i + 4},\n" for i, nm in enumerate(cfg["otype_names"]))
     flag_lines = "".join(f"\t{nm}, // user-defined\n" for nm in cfg["flag_names"])
 
     #if meta_w > 32:  ||<-- previous condition v_1 i removed during testing
@@ -122,7 +122,7 @@ enum Hardware_perms{{
 enum Otypes {{
 	Unsealed = MAX_CAP_OTYPE - 1,
 	Sealed = Unsealed - 1, // Sealed is used as Sentry
-	Reserved = Unsealed - 2,
+	Reserved = Unsealed - 3,
 {otype_lines}}};
 
 enum Flags {{

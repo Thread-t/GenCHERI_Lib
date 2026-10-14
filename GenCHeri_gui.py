@@ -498,7 +498,7 @@ class App(tk.Tk):
         """Names of the three boxes, but only the boxes that are enabled (a disabled box may still hold old text)."""
         p, o, f = (self._int(k) for k in ("p", "o", "f"))
         on = {"perm": p is not None and p > C.PERM_MIN,
-              "otype": o is not None and (1 << o) > 3,
+              "otype": o is not None and (1 << o) > 4,
               "flag": f is not None and f > C.FLAG_MIN}
         boxes = {"perm": self.txt_perm, "otype": self.txt_otype, "flag": self.txt_flag}
         return {k: (self._names(boxes[k]) if on[k] else []) for k in boxes}
@@ -600,17 +600,17 @@ class App(tk.Tk):
                                              f"T = {tb}, B = {bb}, {left} wasted")
             self.refresh_cmd() 
             # self.lbl_names.configure( 
-            #     text=(f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | {f-C.FLAG_MIN} flag names ) can be defined by the user"))
+            #     text=(f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 4} otype names | {f-C.FLAG_MIN} flag names ) can be defined by the user"))
             
-            self._hint = (f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 3} otype names | {f - C.FLAG_MIN} flag names ) can be defined by the user")
+            self._hint = (f"Up to ( {max(p - C.HW_PERM_COUNT, 0)} perm names | {(1 << o) - 4} otype names | {f - C.FLAG_MIN} flag names ) can be defined by the user")
             self._check_names()
 
-            for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, ((1 << o) > 3)), (self.txt_flag, f > C.FLAG_MIN)):
+            for w, on in ((self.txt_perm, p > C.PERM_MIN), (self.txt_otype, ((1 << o) > 4)), (self.txt_flag, f > C.FLAG_MIN)):
                 w.configure(state="normal" if on else "disabled", bg="white" if on else "#eef0f4")
                 if w is self.txt_perm:
                     w.max_enter = p - C.PERM_MIN if on else 1
                 elif w is self.txt_otype:
-                    w.max_enter = (1 << o) - 3 if on else 1
+                    w.max_enter = (1 << o) - 4 if on else 1
                 elif w is self.txt_flag:
                     w.max_enter = f - C.FLAG_MIN if on else 1
                 if w.max_enter < w.enter_count:

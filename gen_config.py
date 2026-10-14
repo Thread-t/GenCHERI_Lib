@@ -163,7 +163,7 @@ def build_cfg(template, compressed, p, o, f, order, perm_names=(), otype_names=(
     max_uperm = p - HW_PERM_COUNT
     if len(perm_names) > max_uperm:
         raise ValueError(f"At most {max_uperm} user-defined perms fit in {p} perm bits (got {len(perm_names)})")
-    max_user = (1 << o) - 3
+    max_user = (1 << o) - 4
     if len(otype_names) > max_user:
         raise ValueError(f"At most {max_user} user-defined otypes fit in {o} otype bits (got {len(otype_names)})")
     max_flag = f - FLAG_MIN # CAP_MODE=0, other flags take 1..(f-1)
