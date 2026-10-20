@@ -126,6 +126,8 @@ SetBound_Ret set_bounds(Capability cs, uint64_t len, SetBound_flag choice);
 
 }
 
+#else
+
 #endif
 """
 
