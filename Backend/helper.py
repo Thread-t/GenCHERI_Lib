@@ -37,11 +37,13 @@ UTILS_DEFS_T1 = r"""#define CAP_IE @IE@
 
 #define E_MAX (ADDR_BITS - (CAP_B_TOP - CAP_B_BOT) - (CAP_BE_TOP - CAP_BE_BOT))
 
+//E for NULL_CAP and INF_CAP should be E_MAX
 #define NULL_CAP (0b0 << CAP_PERM_BOT) | (0b0 << CAP_FLAG_BOT) | (Unsealed << CAP_OTYPE_BOT) | (0b1 << CAP_IE) | \
-				 (0b1 << CAP_L7) | (0b0 << CAP_T_BOT) | (0b10 << CAP_TE_BOT) | (0b0 << CAP_B_BOT) | (0b10 << CAP_BE_BOT)
+				 (0b1 << CAP_L7) | (0b0 << CAP_T_BOT) | (((E_MAX>>2) & 0b11u) << CAP_TE_BOT) | (0b0 << CAP_B_BOT) | \
+                 ((E_MAX & 0b11u) << CAP_BE_BOT)
 #define INF_CAP (@PERM_ONES@ << CAP_PERM_BOT) | (0b0 << CAP_FLAG_BOT) | (Unsealed << CAP_OTYPE_BOT) | \
-				(0b1 << CAP_IE) | (0b1 << CAP_L7) | (0b0 << CAP_T_BOT) | (0b10 << CAP_TE_BOT) | (0b0 << CAP_B_BOT) | (0b10 << CAP_BE_BOT)
-
+				(0b1 << CAP_IE) | (0b1 << CAP_L7) | (0b0 << CAP_T_BOT) | (((E_MAX>>2) & 0b11u) << CAP_TE_BOT) | \
+                (0b0 << CAP_B_BOT) | ((E_MAX & 0b11u) << CAP_BE_BOT)
 
 
 """
@@ -62,11 +64,13 @@ UTILS_DEFS_T2 = r"""#define CAP_IE @IE@
 
 #define E_MAX (ADDR_BITS - (CAP_B_TOP - CAP_B_BOT) - (CAP_BE_TOP - CAP_BE_BOT))
 
+//E for NULL_CAP and INF_CAP should be E_MAX
 #define NULL_CAP (0b0 << CAP_PERM_BOT) | (0b0 << CAP_FLAG_BOT) | (Unsealed << CAP_OTYPE_BOT) | (0b1 << CAP_IE) | \
-				 (0b0 << CAP_T_BOT) | (0b11 << CAP_TE_BOT) | (0b0 << CAP_B_BOT) | (0b10 << CAP_BE_BOT)
+				 (0b0 << CAP_T_BOT) | (((E_MAX>>3) & 0b11u) << CAP_TE_BOT) | (0b0 << CAP_B_BOT) | \
+                 ((E_MAX & 0b111u) << CAP_BE_BOT)
 #define INF_CAP (@PERM_ONES@ << CAP_PERM_BOT) | (0b0 << CAP_FLAG_BOT) | (Unsealed << CAP_OTYPE_BOT) | \
-				(0b1 << CAP_IE) | (0b0 << CAP_T_BOT) | (0b11 << CAP_TE_BOT) | (0b0 << CAP_B_BOT) | (0b10 << CAP_BE_BOT)
-
+				(0b1 << CAP_IE) | (0b0 << CAP_T_BOT) | (((E_MAX>>3) & 0b11u) << CAP_TE_BOT) | (0b0 << CAP_B_BOT) | \
+                ((E_MAX & 0b111u) << CAP_BE_BOT)
 
 
 """
