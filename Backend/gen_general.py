@@ -81,6 +81,11 @@ def generate(cfg):
     else: #for template 1/2
         cheri_def = "typedef uint32_t CHERI; //sayak_G"
 
+    if cfg["template"] == 3 : #Sayak: template 3 always uses BYTES_PER_TAG 8; templates 1/2 uses BYTES_PER_TAG = CAP_LEN / 8
+        bytes_per_tag = ("#define BYTES_PER_TAG  8  //sayak_G")
+    else: #for template 1/2
+        bytes_per_tag = ("#define BYTES_PER_TAG (CAP_LEN / 8) //sayak_G")
+
     u128 = ("typedef unsigned __int128 uint128_t;\n\n"
             if any(widths[k] > 64 for k in "POF") else "")
     instr = ("#define MIN_INSTR_BYTES 2\n"
@@ -111,7 +116,8 @@ def generate(cfg):
 
 #define ADDR_BITS 32
 #define CAP_LEN {32 + meta_w}
-#define BYTES_PER_TAG (CAP_LEN / 8)
+{bytes_per_tag}
+
 
 {instr}
 enum Hardware_perms{{
