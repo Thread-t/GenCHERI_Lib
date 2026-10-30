@@ -80,9 +80,19 @@ UTILS_HEAD_T3 = r"""#include <cstdint>
 
 """
 
-UTILS_DEFS_T3 = r"""inline CHERI NULL_CAP = {0, Unsealed, 0, @BOUNDS_INIT@};
+UTILS_DEFS_T3 = r"""inline const CHERI NULL_CAP(
+    0,
+    Unsealed,
+    0,
+    @BOUNDS_INIT@
+);
 
-inline CHERI INF_CAP = {(BIT_SLICE((~0), (CAP_PERM_TOP - CAP_PERM_BOT), 0)), Unsealed, 0, @BOUNDS_INIT@};
+inline const CHERI INF_CAP( 
+    ((BIT_SLICE((~0), (CAP_PERM_TOP - CAP_PERM_BOT), 0))),
+    Unsealed,
+    0,
+    @BOUNDS_INIT@
+);
 
 """
 

@@ -75,9 +75,60 @@ def generate(cfg):
 
     #if meta_w > 32:  ||<-- previous condition v_1 i removed during testing
     if cfg["template"] == 3 : #Sayak: template 3 always uses struct CHERI; templates 1/2 a plain uint32_t
-        cheri_def = ("struct CHERI {\n    PERM perms;\n    OTYPE otype;\n"
-                     "    FLAG flags;\n  " + c_type(widths["B"]) + " bounds;\n};")
-                     #Sayak: " + ("uint64_t" if widths["B"] <= 64 else "unsigned __int128") + " bounds;\n} CHERI;")
+        cheri_def = f"""struct CHERI {{
+	uint8_t metadata[(CAP_LEN-ADDR_BITS)/8];
+
+    CHERI() = default;
+
+	CHERI(PERM perm, OTYPE otype, FLAG flags, {c_type(widths["B"])} bounds) {{
+		set_perm(perm);
+		set_otype(otype);
+		set_flag(flags);
+		set_bounds(bounds);
+	}}
+
+	PERM get_perm() const {{
+		PERM perm;
+		memcpy(&perm, (metadata+(CAP_PERM_BOT/8)), sizeof(perm));
+		return perm;
+	}}
+
+	void set_perm(PERM perm) {{
+		memcpy((metadata+(CAP_PERM_BOT/8)), &perm, sizeof(perm));
+	}}
+
+	OTYPE get_otype() const {{
+		OTYPE otype;
+		memcpy(&otype, (metadata+(CAP_OTYPE_BOT/8)), sizeof(otype));
+		return otype;
+	}}
+
+	void set_otype(OTYPE otype) {{
+		memcpy((metadata+(CAP_OTYPE_BOT/8)), &otype, sizeof(otype));
+	}}
+
+	OTYPE get_flag() const {{
+		FLAG flags;
+		memcpy(&flags, (metadata+(CAP_FLAG_BOT/8)), sizeof(flags));
+		return flags;
+	}}
+
+	void set_flag(FLAG flags) {{
+		memcpy((metadata+(CAP_FLAG_BOT/8)), &flags, sizeof(flags));
+	}}
+
+    {c_type(widths["B"])} get_bounds() const {{
+        {c_type(widths["B"])} bounds;
+        memcpy(&bounds, (metadata+{pos["B"][0]//8}), sizeof(bounds));
+        return bounds;
+    }}
+
+    void set_bounds({c_type(widths["B"])} bounds) {{
+        memcpy((metadata+{pos["B"][0]//8}), &bounds, sizeof(bounds));
+    }}
+}};
+"""
+        
     else: #for template 1/2
         cheri_def = "typedef uint32_t CHERI; //sayak_G"
 
@@ -92,7 +143,8 @@ def generate(cfg):
              if cfg["compressed"] else "#define MIN_INSTR_BYTES 4\n")
 
     return f"""#include <cstdint>
-
+#include <cstring>
+    
 #ifndef _GENERAL
 #define _GENERAL
 
