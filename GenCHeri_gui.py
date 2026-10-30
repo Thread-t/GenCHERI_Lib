@@ -542,7 +542,10 @@ class App(tk.Tk):
             bw, _, _ = C.bound_and_meta(t, p, o, f, raw)
             parts = C.bound_layout(t, bw, self._int("t") if t in (1, 2) else None)
             order, widths = list(self.v["order"].get()), {"P": p, "O": o, "F": f, "B": bw}
-            lo = C.layout(order, widths)["B"][0]
+            if t == 3: 
+                lo = C.layout_g(order, widths)["B"][0]
+            else:
+                lo = C.layout(order, widths)["B"][0]
             # absolute bit of the bound field's bottom
         except Exception:
             return None
@@ -553,9 +556,10 @@ class App(tk.Tk):
         out = [f"BOUND  {bw} bits   [{bit - 1}:{lo}] in the capability", ""]
         for name, w, hi, low in reversed(lines):           # MSB first, same direction as the order bar
             rng = f"[{hi}]" if hi == low else f"[{hi}:{low}]"
-            out.append(f"  {name:<7}{w:>2} bit{'s' if w != 1 else ' '}  {rng}")
+            if t != 3:
+                out.append(f"  {name:<7}{w:>2} bit{'s' if w != 1 else ' '}  {rng}")
         if t == 3:
-            out.append("\n  (template 3: single field, no inner division)")
+            out.append("\n(template 3: single field, no inner division)")
         return "\n".join(out)
 
     # ------------------------------------------------------------------ dynamic limits

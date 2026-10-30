@@ -103,6 +103,16 @@ def layout(order, widths):
     return pos
 
 
+#spandan : layout for template 3
+def layout_g(order, widths):
+    """order is MSB->LSB; returns {field: (bot, top)} with bit 0 = LSB."""
+    pos, bit = {}, 0
+    for f in reversed(order):
+        pos[f] = (bit, bit + widths[f] - 1)
+        bit += type_bits(widths[f])
+    return pos
+
+
 # ---- user-defined names ------------------------------------------------------------------------
 def name_ok(nm, taken=()):
     """A valid, unused C identifier that does not clash with the built-in permission names."""
